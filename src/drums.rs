@@ -1,4 +1,5 @@
 use crate::pat::trim_pattern;
+use crate::Pattern;
 use rodio::source::Empty;
 use rodio::Sink;
 use rodio::{source::Source, Decoder, OutputStream};
@@ -41,6 +42,10 @@ impl Drums {
         self.tracks.push(trim_pattern(pat).to_string());
     }
 
+    pub fn add_pattern(&mut self, pat: Pattern) {
+        self.add_track(&format!("{:?}", pat));
+    }
+
     pub fn play(&self, loop_count: usize) {
         let (_stream, handle) = OutputStream::try_default().unwrap();
         let sinks = [
@@ -50,22 +55,38 @@ impl Drums {
             Sink::try_new(&handle).unwrap(),
         ];
 
-        for _ in 0..loop_count {
-            for (i, pattern) in self.tracks.iter().enumerate() {
-                let sample = SAMPLES[i];
-                let sink = &sinks[i];
+        let max_track = self.tracks.iter().map(|t| t.len()).max().unwrap_or(0);
+        // The entire play length is max length of all tracks * loop_count
+        let len = max_track * loop_count;
 
-                for step in pattern.chars() {
-                    let volume = if step == '-' {
-                        0.0
-                    } else if step.is_ascii_lowercase() {
-                        0.5
+        for (i, pattern) in self.tracks.iter().enumerate() {
+            let sample = SAMPLES[i];
+            let sink = &sinks[i];
+
+            let mut chars = pattern.chars();
+
+            for _ in 0..len {
+                let step = if let Some(n) = chars.next() {
+                    n
+                } else {
+                    if pattern.is_empty() {
+                        chars = "----------------".chars();
                     } else {
-                        1.0
-                    };
+                        // Every time this pattern ends before max_track, loop over chars again.
+                        chars = pattern.chars();
+                    }
+                    chars.next().unwrap()
+                };
 
-                    sink.append(wav(sample, volume, CLOCK));
-                }
+                let volume = if step == '-' {
+                    0.0
+                } else if step.is_ascii_lowercase() {
+                    0.5
+                } else {
+                    1.0
+                };
+
+                sink.append(wav(sample, volume, CLOCK));
             }
         }
 
@@ -74,19 +95,19 @@ impl Drums {
     }
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
+// #[cfg(test)]
+// mod test {
+//     use super::*;
 
-    #[test]
-    fn drum_test() {
-        let mut drums = Drums::new();
+//     #[test]
+//     fn drum_test() {
+//         let mut drums = Drums::new();
 
-        drums.add_track("|x---x---x---x---|");
-        drums.add_track("|----x-------x---|");
-        drums.add_track("|x---x-x-x---x-x-|");
-        drums.add_track("|--x-------x-----|");
+//         drums.add_track("|x---x---x---x---|"); // kick
+//         drums.add_track("|----x-------x---|"); // clap
+//         drums.add_track("|x---x-x-x---x-x-|"); // hh cl
+//         drums.add_track("|--x-------x-----|"); // hh op
 
-        drums.play(1);
-    }
-}
+//         drums.play(1);
+//     }
+// }
