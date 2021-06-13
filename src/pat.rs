@@ -2,7 +2,7 @@ use core::ops::Range;
 
 const MAX_LEN: usize = 64;
 
-pub type Pattern = Pat<bool>;
+pub type Pattern = Pat<u8>;
 pub type PatternGroup = Pat<Pattern>;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -157,7 +157,7 @@ where
     }
 }
 
-impl PartialEq<&str> for Pat<bool> {
+impl PartialEq<&str> for Pat<u8> {
     fn eq(&self, other: &&str) -> bool {
         let trim = trim_pattern(other);
 
@@ -165,12 +165,15 @@ impl PartialEq<&str> for Pat<bool> {
             return false;
         }
 
-        if self
-            .0
-            .iter()
-            .zip(trim.chars())
-            .any(|(x, y)| *x != (y != '-'))
-        {
+        if self.0.iter().zip(trim.chars()).any(|(x, y)| {
+            if y == '-' {
+                *x != 0
+            } else if y.is_lowercase() {
+                *x == 0 || *x > 127
+            } else {
+                *x <= 127
+            }
+        }) {
             return false;
         }
 
@@ -182,7 +185,15 @@ impl core::fmt::Debug for Pattern {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "|")?;
         for i in 0..self.1 {
-            write!(f, "{}", if self.0[i] { 'x' } else { '-' })?;
+            write!(
+                f,
+                "{}",
+                match self.0[i] {
+                    0 => '-',
+                    x if x <= 127 => 'x',
+                    _ => 'X',
+                }
+            )?;
         }
         write!(f, "|")?;
         Ok(())
@@ -210,8 +221,15 @@ impl From<&str> for Pattern {
         let mut p = Pattern::new();
 
         for step in trimmed.chars() {
-            let on = step != '-';
-            p.push(on);
+            let val = if step == '-' {
+                0
+            } else if step.is_lowercase() {
+                127
+            } else {
+                255
+            };
+
+            p.push(val);
         }
 
         p
@@ -237,47 +255,42 @@ mod test {
 
     #[test]
     fn pattern_add() {
-        let p1: Pattern = "xx".into();
+        let p1: Pattern = "xX".into();
         let p2: Pattern = "-".into();
 
         let x = p1 + p2;
 
         assert_eq!(x.len(), 3);
-        assert_eq!(x[0], true);
-        assert_eq!(x[1], true);
-        assert_eq!(x[2], false);
+        assert_eq!(x[0], 127);
+        assert_eq!(x[1], 255);
+        assert_eq!(x[2], 0);
 
-        assert_eq!(x, "xx-");
-        assert_eq!(x, "|xx-|");
+        assert_eq!(x, "xX-");
+        assert_eq!(x, "|xX-|");
     }
 
     #[test]
     fn pattern_add_0() {
-        let p1: Pattern = "xx".into();
+        let p1: Pattern = "xX".into();
         let p2: Pattern = "".into();
 
         let x = p1 + p2;
 
         assert_eq!(x.len(), 2);
-        assert_eq!(x[0], true);
-        assert_eq!(x[1], true);
+        assert_eq!(x[0], 127);
+        assert_eq!(x[1], 255);
     }
 
     #[test]
     fn pattern_sub() {
-        let mut p1 = Pattern::new();
-
-        p1.push(true);
-        p1.push(true);
-        p1.push(false);
-        p1.push(false);
+        let p1: Pattern = "xX--".into();
 
         assert_eq!(p1.len(), 4);
         let p2 = p1.sub(1..3);
 
         assert_eq!(p2.len(), 2);
-        assert_eq!(p2[0], true);
-        assert_eq!(p2[1], false);
+        assert_eq!(p2[0], 255);
+        assert_eq!(p2[1], 0);
     }
 
     #[test]

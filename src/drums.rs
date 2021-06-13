@@ -85,10 +85,7 @@ impl Drums {
                 for i in 0..pattern.len() {
                     let step = &pattern[i];
 
-                    let volume = match *step {
-                        true => 0.5,
-                        false => 0.0,
-                    };
+                    let volume = *step as f32 / 255.0;
 
                     sink.append(wav(sample, volume, CLOCK));
                 }
