@@ -203,9 +203,9 @@ impl core::fmt::Debug for PatternGroup {
     }
 }
 
-impl Into<Pattern> for &str {
-    fn into(self) -> Pattern {
-        let trimmed = trim_pattern(self);
+impl From<&str> for Pattern {
+    fn from(s: &str) -> Self {
+        let trimmed = trim_pattern(s);
 
         let mut p = Pattern::new();
 
