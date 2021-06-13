@@ -103,10 +103,12 @@ mod test {
     pub fn euclid_drums() {
         let mut drums = Drums::new();
 
-        drums.add_pattern(euclid(4, 16));
+        drums.add_pattern(euclid(3, 18).repeat_to(32).repeat_to(64));
         drums.add_pattern(euclid(2, 16).offset(4));
-        drums.add_pattern(euclid(5, 7));
+        drums.add_pattern(euclid(2, 11).offset(3).repeat_to(32));
         drums.add_pattern(euclid(4, 16).offset(2));
+
+        println!("{:?}", drums);
 
         drums.play(4);
     }

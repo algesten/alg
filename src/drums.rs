@@ -1,4 +1,3 @@
-use crate::pat::trim_pattern;
 use crate::Pattern;
 use rodio::source::Empty;
 use rodio::Sink;
@@ -29,7 +28,19 @@ fn wav(bytes: &'static [u8], volume: f32, duration: f32) -> impl Source<Item = i
 
 #[derive(Default)]
 pub struct Drums {
-    tracks: Vec<String>,
+    tracks: Vec<Pattern>,
+}
+
+impl std::fmt::Debug for Drums {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f)?;
+
+        for t in &self.tracks {
+            writeln!(f, "{:?}", t)?;
+        }
+
+        Ok(())
+    }
 }
 
 impl Drums {
@@ -37,13 +48,24 @@ impl Drums {
         Self::default()
     }
 
-    pub fn add_track(&mut self, pat: &str) {
+    pub fn add_pattern<P: Into<Pattern>>(&mut self, pat: P) {
         assert!(self.tracks.len() < SAMPLES.len());
-        self.tracks.push(trim_pattern(pat).to_string());
-    }
 
-    pub fn add_pattern(&mut self, pat: Pattern) {
-        self.add_track(&format!("{:?}", pat));
+        let mut pat: Pattern = pat.into();
+
+        let cur_max = self.tracks.iter().map(|t| t.len()).max().unwrap_or(0);
+
+        if pat.len() > cur_max {
+            // resize all existing.
+            self.tracks
+                .iter_mut()
+                .for_each(|t| *t = t.repeat_to(pat.len()))
+        } else {
+            // resize pat
+            pat = pat.repeat_to(cur_max);
+        }
+
+        self.tracks.push(pat);
     }
 
     pub fn play(&self, loop_count: usize) {
@@ -55,38 +77,21 @@ impl Drums {
             Sink::try_new(&handle).unwrap(),
         ];
 
-        let max_track = self.tracks.iter().map(|t| t.len()).max().unwrap_or(0);
-        // The entire play length is max length of all tracks * loop_count
-        let len = max_track * loop_count;
+        for _ in 0..loop_count {
+            for (i, pattern) in self.tracks.iter().enumerate() {
+                let sample = SAMPLES[i];
+                let sink = &sinks[i];
 
-        for (i, pattern) in self.tracks.iter().enumerate() {
-            let sample = SAMPLES[i];
-            let sink = &sinks[i];
+                for i in 0..pattern.len() {
+                    let step = &pattern[i];
 
-            let mut chars = pattern.chars();
+                    let volume = match *step {
+                        true => 0.5,
+                        false => 0.0,
+                    };
 
-            for _ in 0..len {
-                let step = if let Some(n) = chars.next() {
-                    n
-                } else {
-                    if pattern.is_empty() {
-                        chars = "----------------".chars();
-                    } else {
-                        // Every time this pattern ends before max_track, loop over chars again.
-                        chars = pattern.chars();
-                    }
-                    chars.next().unwrap()
-                };
-
-                let volume = if step == '-' {
-                    0.0
-                } else if step.is_ascii_lowercase() {
-                    0.5
-                } else {
-                    1.0
-                };
-
-                sink.append(wav(sample, volume, CLOCK));
+                    sink.append(wav(sample, volume, CLOCK));
+                }
             }
         }
 

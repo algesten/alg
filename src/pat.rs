@@ -54,6 +54,22 @@ where
         let m = offset % self.1;
         self.sub(m..self.1) + self.sub(0..m)
     }
+
+    pub fn repeat_to(&self, len: usize) -> Self {
+        assert!(len <= MAX_LEN);
+
+        let n = len / self.1;
+        let m = len % self.1;
+
+        let mut x = Self::new(T::default(), 0);
+
+        for _ in 0..n {
+            x += *self;
+        }
+        x += self.sub(0..m);
+
+        x
+    }
 }
 
 impl<T> Pat<Pat<T>> {
@@ -186,10 +202,10 @@ impl core::fmt::Debug for PatternGroup {
 pub fn trim_pattern(pattern: &str) -> &str {
     let mut trim = pattern.as_bytes();
 
-    if trim[0] == b'|' {
+    if !trim.is_empty() && trim[0] == b'|' {
         trim = &trim[1..];
     }
-    if trim[trim.len() - 1] == b'|' {
+    if !trim.is_empty() && trim[trim.len() - 1] == b'|' {
         trim = &trim[..trim.len() - 1];
     }
 
@@ -243,5 +259,15 @@ mod test {
         assert_eq!(p2.len(), 2);
         assert_eq!(p2[0], true);
         assert_eq!(p2[1], false);
+    }
+
+    #[test]
+    fn trim_test() {
+        assert_eq!(trim_pattern(""), "");
+        assert_eq!(trim_pattern("|"), "");
+        assert_eq!(trim_pattern("||"), "");
+        assert_eq!(trim_pattern("-|"), "-");
+        assert_eq!(trim_pattern("|-"), "-");
+        assert_eq!(trim_pattern("-"), "-");
     }
 }
