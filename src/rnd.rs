@@ -1,6 +1,6 @@
 use core::num::Wrapping as w;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Rnd(u32);
 
 /**

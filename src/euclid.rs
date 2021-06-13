@@ -97,19 +97,19 @@ mod test {
         assert_eq!(euclid(2, 5).offset(6), "|--x-x|");
     }
 
-    use crate::drums::Drums;
+    // use crate::drums::Drums;
 
-    #[test]
-    pub fn euclid_drums() {
-        let mut drums = Drums::new();
+    // #[test]
+    // pub fn euclid_drums() {
+    //     let mut drums = Drums::new();
 
-        drums.add_pattern(euclid(3, 18).repeat_to(32).repeat_to(64));
-        drums.add_pattern(euclid(2, 16).offset(4));
-        drums.add_pattern(euclid(2, 11).offset(3).repeat_to(32));
-        drums.add_pattern(euclid(4, 16).offset(2));
+    //     drums.add_pattern(euclid(3, 18).repeat_to(32).repeat_to(64));
+    //     drums.add_pattern(euclid(2, 16).offset(4));
+    //     drums.add_pattern(euclid(2, 11).offset(3).repeat_to(32));
+    //     drums.add_pattern(euclid(4, 16).offset(2));
 
-        println!("{:?}", drums);
+    //     println!("{:?}", drums);
 
-        drums.play(1);
-    }
+    //     drums.play(1);
+    // }
 }

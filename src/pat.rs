@@ -54,18 +54,22 @@ where
         }
     }
 
-    pub fn offset(&self, offset: usize) -> Self {
-        let m = offset % self.1;
+    pub fn offset(&self, offset: u8) -> Self {
+        let m = (offset as usize) % self.1;
         self.sub(m..self.1) + self.sub(0..m)
     }
 
     pub fn repeat_to(&self, len: usize) -> Self {
         assert!(len <= MAX_LEN);
 
+        let mut x = Self::new();
+
+        if self.1 == 0 {
+            return x;
+        }
+
         let n = len / self.1;
         let m = len % self.1;
-
-        let mut x = Self::new();
 
         for _ in 0..n {
             x += *self;
