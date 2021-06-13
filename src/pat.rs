@@ -56,7 +56,8 @@ where
 
     pub fn offset(&self, offset: u8) -> Self {
         let m = (offset as usize) % self.1;
-        self.sub(m..self.1) + self.sub(0..m)
+        let p = self.1 - m;
+        self.sub(p..self.1) + self.sub(0..p)
     }
 
     pub fn repeat_to(&self, len: usize) -> Self {

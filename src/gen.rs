@@ -17,6 +17,8 @@ pub struct TrackParams {
     pub steps: u8,
     /** Offset of euclidean steps. */
     pub offset: u8,
+    /**  If randomzing steps, whether the steps are targeting "dense" or "sparse" */
+    pub dense: bool,
 }
 
 pub struct Generated<const X: usize> {
@@ -33,6 +35,8 @@ struct TrackGenerator {
 
 impl<const X: usize> Generated<X> {
     pub fn new(params: Params<X>) -> Self {
+        assert!(params.pattern_length > 0);
+
         let mut tracks = [TrackGenerator::default(); X];
 
         // Root randomizer.
@@ -65,16 +69,6 @@ impl TrackGenerator {
     fn generate(&self, pattern_length: usize) -> Pattern {
         let mut rnd = Rnd::new(self.seed);
 
-        let basis = {
-            let mut i = 16;
-            loop {
-                if pattern_length % i == 0 {
-                    break i;
-                }
-                i -= 1;
-            }
-        };
-
         if self.params.length == 0 {
             // disabled
             return Pattern::new_with(0, pattern_length);
@@ -83,12 +77,35 @@ impl TrackGenerator {
         // Ensure length is at least the number of steps.
         let length = self.params.length.max(self.params.steps);
 
+        let basis = {
+            //  17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61
+            const DIV: &[u32] = &[61, 53, 41, 31, 23, 16, 15, 14, 13, 11, 8, 7, 6, 5, 4];
+
+            let mut i = 0;
+
+            loop {
+                if length < 4 || i == DIV.len() {
+                    break pattern_length as u32;
+                }
+
+                if length as u32 / DIV[i] > 0 {
+                    break DIV[i];
+                }
+
+                i += 1;
+            }
+        };
+
         // important to generate this also when it's not used.
         let random_steps = {
-            // basis here is a denominator from 16..1 depending on pattern length.
-            let v = rnd.next() / (u32::max_value() / (basis as u32 - 1));
+            let (offset, range) = offset_range(basis, self.params.dense);
 
-            (v % (length as u32)) + 1
+            println!("offset: {}, range: {}", offset, range);
+
+            // basis here is a denominator from 16..1 depending on pattern length.
+            let v = rnd.next() / (u32::max_value() / range);
+
+            offset + v + 1
         };
 
         let steps = if self.params.steps == 0 {
@@ -104,39 +121,77 @@ impl TrackGenerator {
     }
 }
 
+fn offset_range(basis: u32, dense: bool) -> (u32, u32) {
+    // 1 => 0-0 0-0
+    // 2 => 0-1 1-1
+    // 3 => 0-1 1-2
+    // 4 => 0-2 2-3
+    let rest = (basis as u32 + 1) % 2;
+    let half = (basis - rest) / 2;
+    let off = if dense { half + rest } else { 0 };
+    let range = half + if dense { 0 } else { rest };
+
+    (off, range)
+}
+
 #[cfg(test)]
 mod test {
+    use super::*;
     use crate::drums::Drums;
 
-    use super::*;
+    #[test]
+    fn offset_range_test() {
+        const Z: &[(u32, ((u32, u32), (u32, u32)))] = &[
+            (1, ((0, 0), (0, 0))),
+            (2, ((0, 1), (1, 0))),
+            (3, ((0, 1), (1, 1))),
+            (4, ((0, 2), (2, 1))),
+            (5, ((0, 2), (2, 2))),
+            (6, ((0, 3), (3, 2))),
+            (7, ((0, 3), (3, 3))),
+        ];
+
+        for (basis, eq) in Z {
+            assert_eq!(
+                (offset_range(*basis, false), offset_range(*basis, true)),
+                *eq,
+                "for basis {}",
+                basis
+            );
+        }
+    }
 
     #[test]
     fn generate_test() {
         let mut drums = Drums::new();
 
         let g: Generated<4> = Generated::new(Params {
-            seed: 15,
-            pattern_length: 32,
+            seed: 121,
+            pattern_length: 64,
             tracks: [
                 TrackParams {
-                    steps: 1,
-                    length: 4,
+                    steps: 0,
+                    length: 16,
                     offset: 0,
+                    dense: false,
                 },
                 TrackParams {
-                    steps: 1,
-                    length: 8,
+                    steps: 4,
+                    length: 32,
                     offset: 4,
+                    dense: false,
                 },
                 TrackParams {
                     steps: 0,
                     length: 24,
                     offset: 2,
+                    dense: false,
                 },
                 TrackParams {
                     steps: 0,
                     length: 32,
                     offset: 2,
+                    dense: true,
                 },
             ],
         });
@@ -147,6 +202,6 @@ mod test {
 
         println!("{:?}", drums);
 
-        drums.play(2);
+        drums.play(4);
     }
 }
