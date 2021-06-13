@@ -134,16 +134,7 @@ where
 
 impl PartialEq<&str> for Pat<bool> {
     fn eq(&self, other: &&str) -> bool {
-        let mut trim = other.as_bytes();
-
-        if trim[0] == b'|' {
-            trim = &trim[1..];
-        }
-        if trim[trim.len() - 1] == b'|' {
-            trim = &trim[..trim.len() - 1];
-        }
-
-        let trim = core::str::from_utf8(trim).expect("trimmed string");
+        let trim = trim_pattern(other);
 
         if trim.len() != self.len() {
             return false;
@@ -185,6 +176,19 @@ impl core::fmt::Debug for PatternGroup {
         write!(f, "]")?;
         Ok(())
     }
+}
+
+pub fn trim_pattern(pattern: &str) -> &str {
+    let mut trim = pattern.as_bytes();
+
+    if trim[0] == b'|' {
+        trim = &trim[1..];
+    }
+    if trim[trim.len() - 1] == b'|' {
+        trim = &trim[..trim.len() - 1];
+    }
+
+    core::str::from_utf8(trim).expect("trim pattern")
 }
 
 #[cfg(test)]
