@@ -49,6 +49,11 @@ where
             None
         }
     }
+
+    pub fn offset(&self, offset: usize) -> Self {
+        let m = offset % self.1;
+        self.sub(m..self.1) + self.sub(0..m)
+    }
 }
 
 impl<T> Pat<Pat<T>> {

@@ -2,7 +2,7 @@ use super::{Pattern, PatternGroup};
 
 const EUCLID_MAX: u8 = 64;
 
-pub fn euclid(steps: u8, length: u8, offset: u8) -> Pattern {
+pub fn euclid(steps: u8, length: u8) -> Pattern {
     assert!(steps > 0);
     assert!(length > 0);
     assert!(steps <= EUCLID_MAX);
@@ -34,13 +34,8 @@ pub fn euclid(steps: u8, length: u8, offset: u8) -> Pattern {
         // println!("{:?} {:?}", l, r);
     }
 
-    let flat = l.flatten() + r.flatten();
-    assert_eq!(flat.len(), length as usize);
-
-    // offset cannot be longer than length. just rotate around.
-    let offset = (offset % length) as usize;
-
-    let pattern = flat.sub(offset..flat.len()) + flat.sub(0..offset);
+    let pattern = l.flatten() + r.flatten();
+    assert_eq!(pattern.len(), length as usize);
 
     pattern
 }
@@ -51,12 +46,12 @@ mod test {
 
     #[test]
     pub fn euclid_1_16() {
-        assert_eq!(euclid(1, 16, 0), "|x---------------|");
+        assert_eq!(euclid(1, 16), "|x---------------|");
     }
 
     #[test]
     pub fn euclid_4_16() {
-        assert_eq!(euclid(4, 16, 0), "|x---x---x---x---|");
+        assert_eq!(euclid(4, 16), "|x---x---x---x---|");
     }
 
     // This is to ensure stability in case we change
@@ -64,21 +59,21 @@ mod test {
     // potentially be distributed differently.
     #[test]
     pub fn euclid_prime() {
-        assert_eq!(euclid(2, 7, 0), "|x---x--|");
-        assert_eq!(euclid(3, 7, 0), "|x--x-x-|");
-        assert_eq!(euclid(5, 7, 0), "|x-xxx-x|");
-        assert_eq!(euclid(3, 8, 0), "|x--x-x--|");
-        assert_eq!(euclid(5, 8, 0), "|x-xx-x-x|");
-        assert_eq!(euclid(7, 8, 0), "|x-xxxxxx|");
-        assert_eq!(euclid(3, 16, 0), "|x-----x----x----|");
-        assert_eq!(euclid(5, 16, 0), "|x---x--x--x--x--|");
-        assert_eq!(euclid(7, 16, 0), "|x--x-x-x-x--x-x-|");
-        assert_eq!(euclid(9, 16, 0), "|x-xx-x-x-x-xx-x-|");
-        assert_eq!(euclid(10, 16, 0), "|x-xx-x-xx-xx-x-x|");
-        assert_eq!(euclid(11, 16, 0), "|x-xxx-xx-xx-xx-x|");
-        assert_eq!(euclid(12, 16, 0), "|x-xxx-xxx-xxx-xx|");
-        assert_eq!(euclid(13, 16, 0), "|x-xxxxx-xxxx-xxx|");
-        assert_eq!(euclid(15, 16, 0), "|x-xxxxxxxxxxxxxx|");
+        assert_eq!(euclid(2, 7), "|x---x--|");
+        assert_eq!(euclid(3, 7), "|x--x-x-|");
+        assert_eq!(euclid(5, 7), "|x-xxx-x|");
+        assert_eq!(euclid(3, 8), "|x--x-x--|");
+        assert_eq!(euclid(5, 8), "|x-xx-x-x|");
+        assert_eq!(euclid(7, 8), "|x-xxxxxx|");
+        assert_eq!(euclid(3, 16), "|x-----x----x----|");
+        assert_eq!(euclid(5, 16), "|x---x--x--x--x--|");
+        assert_eq!(euclid(7, 16), "|x--x-x-x-x--x-x-|");
+        assert_eq!(euclid(9, 16), "|x-xx-x-x-x-xx-x-|");
+        assert_eq!(euclid(10, 16), "|x-xx-x-xx-xx-x-x|");
+        assert_eq!(euclid(11, 16), "|x-xxx-xx-xx-xx-x|");
+        assert_eq!(euclid(12, 16), "|x-xxx-xxx-xxx-xx|");
+        assert_eq!(euclid(13, 16), "|x-xxxxx-xxxx-xxx|");
+        assert_eq!(euclid(15, 16), "|x-xxxxxxxxxxxxxx|");
     }
 
     // Brute force try all euclid patterns.
@@ -86,19 +81,33 @@ mod test {
     pub fn euclid_all() {
         for i in 1..=EUCLID_MAX {
             for j in i..=EUCLID_MAX {
-                euclid(i, j, 0);
+                euclid(i, j);
             }
         }
     }
 
     #[test]
     pub fn euclid_offset() {
-        assert_eq!(euclid(2, 5, 0), "|x--x-|");
-        assert_eq!(euclid(2, 5, 1), "|--x-x|");
-        assert_eq!(euclid(2, 5, 2), "|-x-x-|");
-        assert_eq!(euclid(2, 5, 3), "|x-x--|");
-        assert_eq!(euclid(2, 5, 4), "|-x--x|");
-        assert_eq!(euclid(2, 5, 5), "|x--x-|");
-        assert_eq!(euclid(2, 5, 6), "|--x-x|");
+        assert_eq!(euclid(2, 5).offset(0), "|x--x-|");
+        assert_eq!(euclid(2, 5).offset(1), "|--x-x|");
+        assert_eq!(euclid(2, 5).offset(2), "|-x-x-|");
+        assert_eq!(euclid(2, 5).offset(3), "|x-x--|");
+        assert_eq!(euclid(2, 5).offset(4), "|-x--x|");
+        assert_eq!(euclid(2, 5).offset(5), "|x--x-|");
+        assert_eq!(euclid(2, 5).offset(6), "|--x-x|");
+    }
+
+    use crate::drums::Drums;
+
+    #[test]
+    pub fn euclid_drums() {
+        let mut drums = Drums::new();
+
+        drums.add_pattern(euclid(4, 16));
+        drums.add_pattern(euclid(2, 16).offset(4));
+        drums.add_pattern(euclid(5, 7));
+        drums.add_pattern(euclid(4, 16).offset(2));
+
+        drums.play(4);
     }
 }
