@@ -12,10 +12,14 @@ impl<T> Pat<T>
 where
     T: Copy + Default,
 {
-    pub fn new(val: T, length: usize) -> Self {
-        assert!(length <= MAX_LEN);
+    pub fn new() -> Self {
+        Pat([T::default(); MAX_LEN], 0)
+    }
 
-        Pat([val; MAX_LEN], length)
+    pub fn new_with(val: T, len: usize) -> Self {
+        assert!(len <= MAX_LEN);
+
+        Pat([val; MAX_LEN], len)
     }
 
     pub fn len(&self) -> usize {
@@ -61,7 +65,7 @@ where
         let n = len / self.1;
         let m = len % self.1;
 
-        let mut x = Self::new(T::default(), 0);
+        let mut x = Self::new();
 
         for _ in 0..n {
             x += *self;
@@ -77,7 +81,7 @@ impl<T> Pat<Pat<T>> {
     where
         T: Copy + Default,
     {
-        let mut p = Pat::new(T::default(), 0);
+        let mut p = Pat::new();
 
         for i in 0..self.1 {
             p += self[i];
@@ -199,6 +203,21 @@ impl core::fmt::Debug for PatternGroup {
     }
 }
 
+impl Into<Pattern> for &str {
+    fn into(self) -> Pattern {
+        let trimmed = trim_pattern(self);
+
+        let mut p = Pattern::new();
+
+        for step in trimmed.chars() {
+            let on = step != '-';
+            p.push(on);
+        }
+
+        p
+    }
+}
+
 pub fn trim_pattern(pattern: &str) -> &str {
     let mut trim = pattern.as_bytes();
 
@@ -218,8 +237,8 @@ mod test {
 
     #[test]
     fn pattern_add() {
-        let p1 = Pattern::new(true, 2);
-        let p2 = Pattern::new(false, 1);
+        let p1: Pattern = "xx".into();
+        let p2: Pattern = "-".into();
 
         let x = p1 + p2;
 
@@ -234,8 +253,8 @@ mod test {
 
     #[test]
     fn pattern_add_0() {
-        let p1 = Pattern::new(true, 2);
-        let p2 = Pattern::new(false, 0);
+        let p1: Pattern = "xx".into();
+        let p2: Pattern = "".into();
 
         let x = p1 + p2;
 
@@ -246,7 +265,7 @@ mod test {
 
     #[test]
     fn pattern_sub() {
-        let mut p1 = Pattern::new(false, 0);
+        let mut p1 = Pattern::new();
 
         p1.push(true);
         p1.push(true);

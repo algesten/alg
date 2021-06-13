@@ -13,14 +13,14 @@ pub fn euclid(steps: u8, length: u8) -> Pattern {
 
     // Algorithm is inspired by this graphic:
     // https://medium.com/code-music-noise/euclidean-rhythms-391d879494df
-    let mut l = PatternGroup::new(Pattern::new(true, 1), steps as usize);
-    let mut r = PatternGroup::new(Pattern::new(false, 1), (length - steps) as usize);
+    let mut l = PatternGroup::new_with("x".into(), steps as usize);
+    let mut r = PatternGroup::new_with("-".into(), (length - steps) as usize);
 
     while r.len() > 0 {
         let s = l.len().min(r.len());
         let t = l.len().max(r.len());
 
-        let mut nl = PatternGroup::new(Pattern::new(false, 0), 0);
+        let mut nl = PatternGroup::new();
 
         for i in 0..s {
             nl.push(l[i] + r[i]);
@@ -110,6 +110,6 @@ mod test {
 
         println!("{:?}", drums);
 
-        drums.play(4);
+        drums.play(1);
     }
 }
