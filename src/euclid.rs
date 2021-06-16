@@ -89,12 +89,12 @@ mod test {
     #[test]
     pub fn euclid_offset() {
         assert_eq!(euclid(2, 5).offset(0), "|x--x-|");
-        assert_eq!(euclid(2, 5).offset(1), "|--x-x|");
-        assert_eq!(euclid(2, 5).offset(2), "|-x-x-|");
-        assert_eq!(euclid(2, 5).offset(3), "|x-x--|");
-        assert_eq!(euclid(2, 5).offset(4), "|-x--x|");
+        assert_eq!(euclid(2, 5).offset(1), "|-x--x|");
+        assert_eq!(euclid(2, 5).offset(2), "|x-x--|");
+        assert_eq!(euclid(2, 5).offset(3), "|-x-x-|");
+        assert_eq!(euclid(2, 5).offset(4), "|--x-x|");
         assert_eq!(euclid(2, 5).offset(5), "|x--x-|");
-        assert_eq!(euclid(2, 5).offset(6), "|--x-x|");
+        assert_eq!(euclid(2, 5).offset(6), "|-x--x|");
     }
 
     // use crate::drums::Drums;
