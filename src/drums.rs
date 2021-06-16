@@ -9,8 +9,8 @@ use std::time::Duration;
 const SAMPLES: &[&[u8]] = &[
     include_bytes!("../kit/kick.wav"),
     include_bytes!("../kit/clap.wav"),
-    include_bytes!("../kit/hhop.wav"),
     include_bytes!("../kit/hhcl.wav"),
+    include_bytes!("../kit/hhop.wav"),
 ];
 
 const CLOCK: f32 = 1.0 / (4.0 * 135.0 / 60.0);

@@ -98,8 +98,6 @@ impl TrackGenerator {
 
         // important to generate this also when it's not used.
         let random_steps = {
-            println!("{}", range);
-
             let unweighted = rnd.next() / (u32::max_value() / range);
 
             let weighted = (unweighted * self.params.density as u32) / 127;
@@ -108,7 +106,6 @@ impl TrackGenerator {
         };
 
         let steps = if self.params.steps == 0 {
-            println!("random: {}/{}", random_steps, length);
             random_steps as u8
         } else {
             self.params.steps
@@ -127,45 +124,47 @@ mod test {
 
     #[test]
     fn generate_test() {
-        let mut drums = Drums::new();
+        for i in 2..256 {
+            let mut drums = Drums::new();
 
-        let g: Generated<4> = Generated::new(Params {
-            seed: 43,
-            pattern_length: 64,
-            tracks: [
-                TrackParams {
-                    steps: 0,
-                    length: 16,
-                    offset: 0,
-                    density: 33,
-                },
-                TrackParams {
-                    steps: 4,
-                    length: 32,
-                    offset: 4,
-                    density: 20,
-                },
-                TrackParams {
-                    steps: 0,
-                    length: 24,
-                    offset: 2,
-                    density: 40,
-                },
-                TrackParams {
-                    steps: 0,
-                    length: 32,
-                    offset: 2,
-                    density: 80,
-                },
-            ],
-        });
+            let g: Generated<4> = Generated::new(Params {
+                seed: i,
+                pattern_length: 64,
+                tracks: [
+                    TrackParams {
+                        steps: 0,
+                        length: 16,
+                        offset: 0,
+                        density: 30,
+                    },
+                    TrackParams {
+                        steps: 0,
+                        length: 32,
+                        offset: 4,
+                        density: 30,
+                    },
+                    TrackParams {
+                        steps: 0,
+                        length: 24,
+                        offset: 2,
+                        density: 80,
+                    },
+                    TrackParams {
+                        steps: 0,
+                        length: 32,
+                        offset: 2,
+                        density: 50,
+                    },
+                ],
+            });
 
-        for i in 0..g.len() {
-            drums.add_pattern(g.get_pattern(i));
+            for i in 0..g.len() {
+                drums.add_pattern(g.get_pattern(i));
+            }
+
+            println!("{:?}", drums);
+
+            drums.play(1);
         }
-
-        println!("{:?}", drums);
-
-        drums.play(4);
     }
 }
