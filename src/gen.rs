@@ -77,8 +77,11 @@ impl TrackGenerator {
         // Ensure length is at least the number of steps.
         let length = self.params.length.max(self.params.steps);
 
+        // This tries to find a subdivision of the pattern length. We use that as range
+        // for randomizing the euclidean steps when the user parameter is set to 0 (random).
+        // This is because I don't think  a large number of steps doesn't make for very
+        // interesting rhythms (almost every 16th sounding with some euclidean distributed "holes").
         let range = {
-            //  17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61
             const DIV: &[u32] = &[61, 53, 41, 31, 23, 16, 15, 14, 13, 11, 8, 7, 6, 5, 4];
 
             let mut i = 0;
@@ -96,7 +99,7 @@ impl TrackGenerator {
             }
         };
 
-        // important to generate this also when it's not used.
+        // important to generate this also when it's not used since we need rnd.next() every time.
         let random_steps = {
             let unweighted = rnd.next() / (u32::max_value() / range);
 

@@ -1,3 +1,7 @@
+//! This is a simple drum player with 4 samples for testing.
+//! It takes up to 4 patterns and the order they are added matters.
+//! kick, clap, closed and open hihat.
+
 use crate::Pattern;
 use rodio::source::Empty;
 use rodio::Sink;
@@ -13,6 +17,7 @@ const SAMPLES: &[&[u8]] = &[
     include_bytes!("../kit/hhop.wav"),
 ];
 
+/// 135 BPM.
 const CLOCK: f32 = 1.0 / (4.0 * 135.0 / 60.0);
 
 fn wav(bytes: &'static [u8], volume: f32, duration: f32) -> impl Source<Item = i16> {
@@ -23,6 +28,7 @@ fn wav(bytes: &'static [u8], volume: f32, duration: f32) -> impl Source<Item = i
     Decoder::new(buf)
         .unwrap()
         .amplify(volume)
+        // To avoid clicks, we crossfade each sound to silence.
         .take_crossfade_with(silence, Duration::from_secs_f32(duration))
 }
 

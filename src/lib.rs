@@ -1,3 +1,4 @@
+// For tests we use std.
 #![cfg_attr(not(test), no_std)]
 
 mod euclid;

@@ -2,9 +2,12 @@ use core::ops::Range;
 
 const MAX_LEN: usize = 64;
 
+/// A rhythmical pattern. Each step is a `u8` representing the velocity of that step.
 pub type Pattern = Pat<u8>;
+/// A group of patterns (pattern of patterns).
 pub type PatternGroup = Pat<Pattern>;
 
+/// Generic pattern.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Pat<T>([T; MAX_LEN], usize);
 
@@ -12,20 +15,24 @@ impl<T> Pat<T>
 where
     T: Copy + Default,
 {
+    /// Construct a new pattern of length 0. Each value is `T::default()`.
     pub fn new() -> Self {
         Pat([T::default(); MAX_LEN], 0)
     }
 
+    /// Construct a new pattern repeating `val` and setting the length.
     pub fn new_with(val: T, len: usize) -> Self {
         assert!(len <= MAX_LEN);
 
         Pat([val; MAX_LEN], len)
     }
 
+    /// Length of the pattern.
     pub fn len(&self) -> usize {
         self.1
     }
 
+    /// Append a value to the pattern. Increases length by 1.
     pub fn push(&mut self, val: T) {
         assert!(self.1 + 1 <= MAX_LEN);
 
@@ -33,6 +40,9 @@ where
         self.1 += 1;
     }
 
+    /// Clone a subrange of the pattern.
+    ///
+    /// TODO: Maybe do this as index operators?
     pub fn sub(&self, range: Range<usize>) -> Self {
         let mut p = [T::default(); MAX_LEN];
 
@@ -46,6 +56,7 @@ where
         Pat(p, len)
     }
 
+    /// Get the value at `index`.
     pub fn get(&self, index: usize) -> Option<T> {
         if index < self.1 {
             Some(self.0[index])
@@ -54,12 +65,27 @@ where
         }
     }
 
+    /// Make a copy of self where each value is `offset` to the right. Values pushed
+    /// off the end to right wraps around and comes in at the beginning.
+    ///
+    /// ```ignore
+    /// Start:    --A---B-CD-
+    /// Offset 1: ---A---B-CD
+    /// Offset 5: B-CD---A---
+    /// ```
     pub fn offset(&self, offset: u8) -> Self {
         let m = (offset as usize) % self.1;
         let p = self.1 - m;
         self.sub(p..self.1) + self.sub(0..p)
     }
 
+    /// Lengthen the pattern by repeating what is already there to an absolute `len`.
+    ///
+    /// ```ignore
+    /// Start:     xA-B
+    /// Repeat 7:  xA-BxA-
+    /// Repeat 12: xA-BxA-BxA-B
+    /// ```
     pub fn repeat_to(&self, len: usize) -> Self {
         assert!(len <= MAX_LEN);
 
@@ -82,6 +108,8 @@ where
 }
 
 impl<T> Pat<Pat<T>> {
+    /// Concatenate the inner `Pat<T>` in `Pat<Pat<T>>` to a `Pat<T>`.
+    /// Sometimes called "flatmap". `[[1,2],[3,4]]` becomes `[1,2,3,4]`
     pub fn flatten(&self) -> Pat<T>
     where
         T: Copy + Default,
@@ -219,6 +247,14 @@ impl core::fmt::Debug for PatternGroup {
     }
 }
 
+/// Quick way to make patterns from strings.
+///
+/// * `-` is off
+/// * `x` is velocity 127
+/// * `X` is velocity 255
+///
+/// Example:
+/// A 4-on-the-floor bass drum with emphasis on 1: `X---x---x---x---`
 impl From<&str> for Pattern {
     fn from(s: &str) -> Self {
         let trimmed = trim_pattern(s);
