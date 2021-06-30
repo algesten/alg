@@ -122,12 +122,18 @@ impl TrackGenerator {
 
 #[cfg(test)]
 mod test {
+    use std::time::SystemTime;
+
     use super::*;
     use crate::drums::Drums;
 
     #[test]
     fn generate_test() {
-        for i in 2..256 {
+        let x = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs_f32() as u32;
+        for i in x..(x + 1000) {
             let mut drums = Drums::new();
 
             let g: Generated<4> = Generated::new(Params {
