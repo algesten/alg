@@ -5,6 +5,7 @@ authors = ["Martin Algesten <martin@algesten.se>"]
 edition = "2018"
 
 [dependencies]
+gcd = "2"
 
 [dev-dependencies]
 rodio = {version = "0.14", default-features = false, features = ['wav']}
