@@ -50,8 +50,7 @@ where
     /// Get the current time. This is reasonably called _after_ `tick()`.
     pub fn now(&self) -> Time<FQ> {
         Time {
-            upper: self.upper,
-            lower: self.lower,
+            count: ((self.upper as i64) << 32) | (self.lower as i64),
         }
     }
 }
@@ -59,84 +58,67 @@ where
 /// A time representation as produced by `Clock::now()`.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Time<const FQ: u32> {
-    upper: u32,
-    lower: u32,
+    pub count: i64,
 }
 
 impl<const FQ: u32> Time<FQ> {
-    pub fn new(upper: u32, lower: u32) -> Self {
-        Time { upper, lower }
+    /// Create a new instance of Time setting the count.
+    ///
+    /// This is probably not what you want to do.
+    pub fn new(count: i64) -> Self {
+        Time { count }
+    }
+
+    /// Create a new instance converted from a number of seconds.
+    pub fn from_secs(secs: i64) -> Self {
+        Time {
+            count: secs * (FQ as i64),
+        }
+    }
+
+    // Create a new instance converted from a number of milliseconds.
+    pub fn from_millis(millis: i64) -> Self {
+        Time {
+            count: (millis * FQ as i64) / 1000,
+        }
     }
 
     /// Time rounded off to full seconds. This is calculated using `FQ` clock frequency,
     /// and probably isn't very exact because the oscillating crystals driving a CPU are
     /// never exactly what they say they are.
-    pub fn seconds(&self) -> u32 {
-        let mut full_seconds = self.upper * (u32::MAX / FQ);
-
-        // We want this which would overflow: (self.upper * u32::MAX) % FQ
-
-        // Distributive properties of modulo
-        // ( a + b ) % c = ( ( a % c ) + ( b % c ) ) % c
-        // ( a * b ) % c = ( ( a % c ) * ( b % c ) ) % c
-        // ( a – b ) % c = ( ( a % c ) – ( b % c ) ) % c
-        // ( a / b ) % c = ( ( a % c ) / ( b % c ) ) % c
-
-        let upper_rest = ((self.upper % FQ) * (u32::MAX % FQ)) % FQ;
-
-        let (over, overflow) = upper_rest.overflowing_add(self.lower);
-
-        if overflow {
-            full_seconds += u32::MAX / FQ;
-        }
-
-        full_seconds += over / FQ;
-
-        full_seconds
+    pub fn seconds(&self) -> i64 {
+        self.count / (FQ as i64)
     }
 
     /// Fractional seconds in milliseconds. I.e. if time is 500E6 and clock frequency is 600E6,
     /// this function returns 833.
-    ///
-    /// NB panics if `FQ` is less than 1000.
-    pub fn subsec_millis(&self) -> u32 {
-        assert!(FQ >= 1, "subsec_millis requires FQ >= 1000");
-
-        let upper_rest = ((self.upper % FQ) * (u32::MAX % FQ)) % FQ;
-
-        let over = upper_rest.wrapping_add(self.lower);
-
-        let lower_rest = over % FQ;
-
-        lower_rest / (FQ / 1000)
+    pub fn subsec_millis(&self) -> i64 {
+        let rest = self.count % FQ as i64;
+        rest / ((FQ as i64) / 1000)
     }
 
     /// Fractional seconds in nanoseconds. I.e. if time is 500E6 and clock frequency is 600E6,
     /// this function returns 833_333.
-    pub fn subsec_nanos(&self) -> u32 {
-        let upper_rest = ((self.upper % FQ) * (u32::MAX % FQ)) % FQ;
+    pub fn subsec_nanos(&self) -> i64 {
+        let rest = self.count % FQ as i64;
 
-        let over = upper_rest.wrapping_add(self.lower);
+        let g = (FQ as u64).gcd(1_000_000_000) as i64;
+        let nom = (FQ as i64) / g;
+        let denom = 1_000_000_000 / g;
 
-        let lower_rest = over % FQ;
+        (rest * denom) / nom
+    }
+}
 
-        let g = FQ.gcd(1000_000_000);
-        let nom = FQ / g;
-        let denom = 1000_000_000 / g;
-
-        let (m, overflow) = lower_rest.overflowing_mul(denom);
-        if overflow {
-            // this will lose precision since we're scaling down then up.
-            (lower_rest / nom) * denom
-        } else {
-            m / nom
-        }
+impl<const FQ: u32> core::fmt::Display for Time<FQ> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}.{:03}s", self.seconds(), self.subsec_millis())
     }
 }
 
 impl<const FQ: u32> core::fmt::Debug for Time<FQ> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{}.{}", self.seconds(), self.subsec_millis())
+        write!(f, "Time {{ {:08x} }}", self.count)
     }
 }
 
@@ -144,15 +126,9 @@ impl<const FQ: u32> core::ops::Add for Time<FQ> {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        let mut upper = self.upper + rhs.upper;
-
-        let (lower, over) = self.lower.overflowing_add(rhs.lower);
-
-        if over {
-            upper += 1;
+        Time {
+            count: self.count + rhs.count,
         }
-
-        Time { upper, lower }
     }
 }
 
@@ -160,31 +136,33 @@ impl<const FQ: u32> core::ops::Sub for Time<FQ> {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        let mut upper = self.upper - rhs.upper;
-
-        let (lower, over) = self.lower.overflowing_sub(rhs.lower);
-
-        if over {
-            upper -= 1;
+        Time {
+            count: self.count - rhs.count,
         }
-
-        Time { upper, lower }
     }
 }
 
 impl<const FQ: u32> core::ops::AddAssign for Time<FQ> {
     fn add_assign(&mut self, rhs: Self) {
-        let x = *self + rhs;
-        self.upper = x.upper;
-        self.lower = x.lower;
+        self.count += rhs.count;
     }
 }
 
 impl<const FQ: u32> core::ops::SubAssign for Time<FQ> {
     fn sub_assign(&mut self, rhs: Self) {
-        let x = *self - rhs;
-        self.upper = x.upper;
-        self.lower = x.lower;
+        self.count -= rhs.count;
+    }
+}
+
+impl<const FQ: u32> core::cmp::PartialOrd for Time<FQ> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<const FQ: u32> core::cmp::Ord for Time<FQ> {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.count.cmp(&other.count)
     }
 }
 
@@ -193,49 +171,57 @@ mod test {
     use super::*;
 
     #[test]
+    fn time_from_secs() {
+        let t = Time::<600_000_000>::from_secs(10);
+        assert_eq!(format!("{}", t), "10.000s");
+        let t = Time::<600_000_000>::from_secs(6);
+        assert_eq!(format!("{}", t), "6.000s");
+        let t = Time::<600_000_000>::from_secs(0);
+        assert_eq!(format!("{}", t), "0.000s");
+        let t = Time::<600_000_000>::from_secs(49);
+        assert_eq!(format!("{}", t), "49.000s");
+    }
+
+    #[test]
     fn time_seconds_millis_nanos() {
-        let t: Time<600_000_000> = Time::new(0, 500_000_000);
+        let t: Time<600_000_000> = Time::new(500_000_000);
         assert_eq!(t.seconds(), 0);
         assert_eq!(t.subsec_millis(), 833);
         assert_eq!(t.subsec_nanos(), 833_333_333);
 
-        let t: Time<600_000_000> = Time::new(1, 700_000_000);
-        assert_eq!(t.seconds(), 8);
-        assert_eq!(t.subsec_millis(), 324);
-        assert_eq!(t.subsec_nanos(), 324_945_491);
+        let t: Time<600_000_000> = Time::new(700_000_000);
+        assert_eq!(t.seconds(), 1);
+        assert_eq!(t.subsec_millis(), 166);
+        assert_eq!(t.subsec_nanos(), 166666666);
     }
 
     #[test]
     fn time_add() {
-        let t1: Time<600_000_000> = Time::new(0, u32::MAX);
-        let t2: Time<600_000_000> = Time::new(0, 1);
+        let t1: Time<600_000_000> = Time::new(u32::MAX as i64);
+        let t2: Time<600_000_000> = Time::new(1);
 
         let t3 = t1 + t2;
 
-        assert_eq!(t3.upper, 1);
-        assert_eq!(t3.lower, 0);
+        assert_eq!(t3.count, 0x1_0000_0000);
 
-        let mut t4 = Time::new(0, 1);
-        t4 += Time::<600_000_000>::new(0, 1);
+        let mut t4 = Time::new(1);
+        t4 += Time::<600_000_000>::new(1);
 
-        assert_eq!(t4.upper, 0);
-        assert_eq!(t4.lower, 2);
+        assert_eq!(t4.count, 2);
     }
 
     #[test]
     fn time_sub() {
-        let t1: Time<600_000_000> = Time::new(1, 0);
-        let t2: Time<600_000_000> = Time::new(0, 1);
+        let t1: Time<600_000_000> = Time::new(0);
+        let t2: Time<600_000_000> = Time::new(1);
 
         let t3 = t1 - t2;
 
-        assert_eq!(t3.upper, 0);
-        assert_eq!(t3.lower, u32::MAX);
+        assert_eq!(t3.count, -1);
 
-        let mut t4 = Time::new(0, 1);
-        t4 -= Time::<600_000_000>::new(0, 1);
+        let mut t4 = Time::new(1);
+        t4 -= Time::<600_000_000>::new(1);
 
-        assert_eq!(t4.upper, 0);
-        assert_eq!(t4.lower, 0);
+        assert_eq!(t4.count, 0);
     }
 }
