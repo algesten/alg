@@ -1,5 +1,9 @@
 use crate::{euclid, Pattern, Rnd};
 
+const DEFAULT_PATTERN_LEN: u8 = 64;
+const DEFAULT_TRACK_LEN: u8 = 64;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Params<const X: usize> {
     /** Random seed to generate all randomness from. */
     pub seed: u32,
@@ -9,7 +13,17 @@ pub struct Params<const X: usize> {
     pub tracks: [TrackParams; X],
 }
 
-#[derive(Clone, Copy, Default)]
+impl<const X: usize> Default for Params<X> {
+    fn default() -> Self {
+        Params {
+            seed: 0,
+            pattern_length: DEFAULT_PATTERN_LEN,
+            tracks: [TrackParams::default(); X],
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TrackParams {
     /** Length of track. In clock-ticks. */
     pub length: u8,
@@ -21,12 +35,32 @@ pub struct TrackParams {
     pub density: u8,
 }
 
+impl Default for TrackParams {
+    fn default() -> Self {
+        TrackParams {
+            length: DEFAULT_TRACK_LEN,
+            steps: 0,
+            offset: 0,
+            density: 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Generated<const X: usize> {
     pattern_length: u8,
     tracks: [TrackGenerator; X],
 }
 
-#[derive(Clone, Copy, Default)]
+impl<const X: usize> Default for Generated<X> {
+    fn default() -> Self {
+        Generated::new(Params {
+            ..Default::default()
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 struct TrackGenerator {
     /** Seed per track to not change depending on global seed. */
     seed: u32,
