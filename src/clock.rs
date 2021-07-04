@@ -56,28 +56,30 @@ where
 }
 
 /// A time representation as produced by `Clock::now()`.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Default)]
 pub struct Time<const FQ: u32> {
     pub count: i64,
 }
 
 impl<const FQ: u32> Time<FQ> {
+    pub const ZERO: Time<FQ> = Time::new(0);
+
     /// Create a new instance of Time setting the count.
     ///
     /// This is probably not what you want to do.
-    pub fn new(count: i64) -> Self {
+    pub const fn new(count: i64) -> Self {
         Time { count }
     }
 
     /// Create a new instance converted from a number of seconds.
-    pub fn from_secs(secs: i64) -> Self {
+    pub const fn from_secs(secs: i64) -> Self {
         Time {
             count: secs * (FQ as i64),
         }
     }
 
     // Create a new instance converted from a number of milliseconds.
-    pub fn from_millis(millis: i64) -> Self {
+    pub const fn from_millis(millis: i64) -> Self {
         Time {
             count: (millis * FQ as i64) / 1000,
         }
@@ -97,8 +99,20 @@ impl<const FQ: u32> Time<FQ> {
         rest / ((FQ as i64) / 1000)
     }
 
-    /// Fractional seconds in nanoseconds. I.e. if time is 500E6 and clock frequency is 600E6,
+    /// Fractional seconds in microseconds. I.e. if time is 500E6 and clock frequency is 600E6,
     /// this function returns 833_333.
+    pub fn subsec_micros(&self) -> i64 {
+        let rest = self.count % FQ as i64;
+
+        let g = (FQ as u64).gcd(1_000_000) as i64;
+        let nom = (FQ as i64) / g;
+        let denom = 1_000_000 / g;
+
+        (rest * denom) / nom
+    }
+
+    /// Fractional seconds in nanoseconds. I.e. if time is 500E6 and clock frequency is 600E6,
+    /// this function returns 833_333_333.
     pub fn subsec_nanos(&self) -> i64 {
         let rest = self.count % FQ as i64;
 
