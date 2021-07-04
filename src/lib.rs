@@ -9,7 +9,7 @@ mod rnd;
 
 pub use clock::{Clock, Time};
 pub use euclid::euclid;
-pub use gen::{Generated, Params, TrackParams};
+pub use gen::{Generated, Params, TrackParams, STOKAST_PARAMS};
 pub use pat::{Pattern, PatternGroup};
 pub use rnd::Rnd;
 

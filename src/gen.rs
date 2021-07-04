@@ -3,6 +3,37 @@ use crate::{euclid, Pattern, Rnd};
 const DEFAULT_PATTERN_LEN: u8 = 64;
 const DEFAULT_TRACK_LEN: u8 = 64;
 
+pub const STOKAST_PARAMS: Params<4> = Params {
+    seed: 0,
+    pattern_length: 64,
+    tracks: [
+        TrackParams {
+            steps: 0,
+            length: 16,
+            offset: 0,
+            density: 30,
+        },
+        TrackParams {
+            steps: 0,
+            length: 32,
+            offset: 4,
+            density: 30,
+        },
+        TrackParams {
+            steps: 0,
+            length: 24,
+            offset: 2,
+            density: 80,
+        },
+        TrackParams {
+            steps: 0,
+            length: 32,
+            offset: 2,
+            density: 50,
+        },
+    ],
+};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Params<const X: usize> {
     /** Random seed to generate all randomness from. */
@@ -173,36 +204,7 @@ mod test {
         for i in x..(x + 1000) {
             let mut drums = Drums::new();
 
-            let g: Generated<4> = Generated::new(Params {
-                seed: i,
-                pattern_length: 64,
-                tracks: [
-                    TrackParams {
-                        steps: 0,
-                        length: 16,
-                        offset: 0,
-                        density: 30,
-                    },
-                    TrackParams {
-                        steps: 0,
-                        length: 32,
-                        offset: 4,
-                        density: 30,
-                    },
-                    TrackParams {
-                        steps: 0,
-                        length: 24,
-                        offset: 2,
-                        density: 80,
-                    },
-                    TrackParams {
-                        steps: 0,
-                        length: 32,
-                        offset: 2,
-                        density: 50,
-                    },
-                ],
-            });
+            let g: Generated<4> = Generated::new(STOKAST_PARAMS);
 
             for i in 0..g.len() {
                 drums.add_pattern(g.get_pattern(i));
