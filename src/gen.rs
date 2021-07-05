@@ -1,4 +1,6 @@
-use crate::{euclid, Pattern, Rnd};
+use crate::euclid::euclid;
+use crate::pat::Pattern;
+use crate::rnd::Rnd;
 
 const DEFAULT_PATTERN_LEN: u8 = 64;
 const DEFAULT_TRACK_LEN: u8 = 64;
@@ -203,6 +205,9 @@ mod test {
             .as_secs_f32() as u32;
         for i in x..(x + 1000) {
             let mut drums = Drums::new();
+
+            let mut params = STOKAST_PARAMS;
+            params.seed = i;
 
             let g: Generated<4> = Generated::new(STOKAST_PARAMS);
 

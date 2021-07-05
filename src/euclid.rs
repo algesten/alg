@@ -1,4 +1,4 @@
-use super::{Pattern, PatternGroup};
+use crate::pat::{Pattern, PatternGroup};
 
 const EUCLID_MAX: u8 = 64;
 

@@ -1,17 +1,11 @@
 // For tests we use std.
 #![cfg_attr(not(test), no_std)]
 
-mod clock;
-mod euclid;
-mod gen;
-mod pat;
-mod rnd;
-
-pub use clock::{Clock, Time};
-pub use euclid::euclid;
-pub use gen::{Generated, Params, TrackParams, STOKAST_PARAMS};
-pub use pat::{Pattern, PatternGroup};
-pub use rnd::Rnd;
+pub mod clock;
+pub mod euclid;
+pub mod gen;
+pub mod pat;
+pub mod rnd;
 
 #[cfg(test)]
 mod drums;

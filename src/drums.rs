@@ -2,7 +2,7 @@
 //! It takes up to 4 patterns and the order they are added matters.
 //! kick, clap, closed and open hihat.
 
-use crate::Pattern;
+use crate::pat::Pattern;
 use rodio::source::Empty;
 use rodio::Sink;
 use rodio::{source::Source, Decoder, OutputStream};
