@@ -53,6 +53,18 @@ where
             count: ((self.upper as i64) << 32) | (self.lower as i64),
         }
     }
+
+    pub fn delay_nanos(&mut self, ns: u64) {
+        self.tick();
+        let start = self.now();
+        let until = Time::from_nanos(ns as i64);
+        loop {
+            self.tick();
+            if self.now() - start >= until {
+                break;
+            }
+        }
+    }
 }
 
 /// A time representation as produced by `Clock::now()`.
@@ -82,6 +94,13 @@ impl<const FQ: u32> Time<FQ> {
     pub const fn from_millis(millis: i64) -> Self {
         Time {
             count: (millis * FQ as i64) / 1000,
+        }
+    }
+
+    // Create a new instance converted from a number of milliseconds.
+    pub const fn from_nanos(nanos: i64) -> Self {
+        Time {
+            count: (nanos * FQ as i64) / 1000_000_000,
         }
     }
 
