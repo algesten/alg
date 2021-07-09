@@ -81,8 +81,8 @@ impl Default for TrackParams {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Generated<const X: usize> {
-    pattern_length: u8,
-    tracks: [TrackGenerator; X],
+    pub pattern_length: u8,
+    pub patterns: [Pattern; X],
 }
 
 impl<const X: usize> Default for Generated<X> {
@@ -104,31 +104,29 @@ impl<const X: usize> Generated<X> {
     pub fn new(params: Params<X>) -> Self {
         assert!(params.pattern_length > 0);
 
-        let mut tracks = [TrackGenerator::default(); X];
-
         // Root randomizer.
         let mut rnd = Rnd::new(params.seed);
 
-        for i in 0..X {
-            tracks[i] = TrackGenerator {
+        let mut patterns: [Pattern; X] = [Pattern::default(); X];
+
+        for (i, pat) in patterns.iter_mut().enumerate() {
+            let gen = TrackGenerator {
                 // mix in track index to not get the same patterns in all tracks
                 seed: rnd.next() + (i as u32),
                 params: params.tracks[i],
             };
+
+            *pat = gen.generate(params.pattern_length as usize);
         }
 
         Generated {
             pattern_length: params.pattern_length,
-            tracks,
+            patterns,
         }
     }
 
     pub fn len(&self) -> usize {
         X
-    }
-
-    pub fn get_pattern(&self, index: usize) -> Pattern {
-        self.tracks[index].generate(self.pattern_length as usize)
     }
 }
 
@@ -212,7 +210,7 @@ mod test {
             let g: Generated<4> = Generated::new(STOKAST_PARAMS);
 
             for i in 0..g.len() {
-                drums.add_pattern(g.get_pattern(i));
+                drums.add_pattern(g.patterns[i]);
             }
 
             println!("{:?}", drums);
