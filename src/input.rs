@@ -1,3 +1,5 @@
+use core::ops::BitAnd;
+
 use crate::clock::Time;
 
 /// An input that produces deltas. Think rotary encoder that will give us
@@ -13,6 +15,40 @@ pub trait DigitalInput<const CLK: u32> {
     /// some time in the past when having debounce logic to ensure the state really is
     /// high or low.
     fn tick(&mut self, now: Time<CLK>) -> HiLo<CLK>;
+}
+
+/// Digital input over reading a pointer to a shared number.
+pub struct BitmaskDigitalInput<W> {
+    word: *const W,
+    mask: W,
+    zero: W,
+}
+
+impl<W> BitmaskDigitalInput<W>
+where
+    W: BitAnd<Output = W> + Default + Copy + PartialOrd,
+{
+    pub fn new(word: *const W, mask: W) -> Self {
+        BitmaskDigitalInput {
+            word,
+            mask,
+            zero: W::default(),
+        }
+    }
+}
+
+impl<W, const CLK: u32> DigitalInput<CLK> for BitmaskDigitalInput<W>
+where
+    W: BitAnd<Output = W> + Default + Copy + PartialOrd,
+{
+    fn tick(&mut self, now: Time<CLK>) -> HiLo<CLK> {
+        let hi = unsafe { *self.word }.bitand(self.mask) > self.zero;
+        if hi {
+            HiLo::Hi(now)
+        } else {
+            HiLo::Lo(now)
+        }
+    }
 }
 
 /// Representation of a hi or a low (on/off) state. The state

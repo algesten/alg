@@ -14,6 +14,7 @@ mod drums;
 
 pub trait SetBit {
     fn set_bit(&mut self, bit: u8, on: bool);
+    fn is_bit(&self, bit: u8) -> bool;
 }
 
 impl SetBit for u16 {
@@ -23,5 +24,9 @@ impl SetBit for u16 {
         } else {
             *self = *self & !(1 << bit);
         }
+    }
+
+    fn is_bit(&self, bit: u8) -> bool {
+        *self & (1 << bit) > 0
     }
 }
