@@ -1,6 +1,9 @@
 // For tests we use std.
 #![cfg_attr(not(test), no_std)]
 
+#[macro_use]
+extern crate log;
+
 pub mod clock;
 pub mod encoder;
 pub mod euclid;

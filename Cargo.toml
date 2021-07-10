@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 gcd = "2"
+log = "0.4"
 
 [dev-dependencies]
 rodio = {version = "0.14", default-features = false, features = ['wav']}

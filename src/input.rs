@@ -53,10 +53,20 @@ where
 
 /// Representation of a hi or a low (on/off) state. The state
 /// is always tied to a time when the state flipped to high or low.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy)]
 pub enum HiLo<const CLK: u32> {
     Hi(Time<CLK>),
     Lo(Time<CLK>),
+}
+
+impl<const CLK: u32> PartialEq for HiLo<CLK> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (HiLo::Hi(_), HiLo::Hi(_)) => true,
+            (HiLo::Lo(_), HiLo::Lo(_)) => true,
+            _ => false,
+        }
+    }
 }
 
 impl<const CLK: u32> HiLo<CLK> {
@@ -119,7 +129,12 @@ where
 {
     fn tick(&mut self, now: Time<CLK>) -> Option<Edge<CLK>> {
         let x = self.input.tick(now);
+
         if x != self.value {
+            trace!("EdgeInput trigger: {:?} -> {:?}", self.value, x);
+
+            self.value = x;
+
             Some(match x {
                 HiLo::Hi(t) => Edge::Rising(t),
                 HiLo::Lo(t) => Edge::Falling(t),
