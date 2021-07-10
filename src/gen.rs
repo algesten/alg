@@ -5,8 +5,11 @@ use crate::rnd::Rnd;
 const DEFAULT_PATTERN_LEN: u8 = 64;
 const DEFAULT_TRACK_LEN: u8 = 64;
 
+/// Base for seed since starting at 0 is so boring.
+pub const SEED_BASE: i32 = 0x616c67;
+
 pub const STOKAST_PARAMS: Params<4> = Params {
-    seed: 0,
+    seed: SEED_BASE as u32,
     pattern_length: 64,
     tracks: [
         TrackParams {
