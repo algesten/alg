@@ -56,7 +56,6 @@ const TABLE: [i8; 16] = [
 ];
 
 use core::ops::BitAnd;
-use core::ops::BitOr;
 
 use crate::clock::Time;
 use crate::input::DeltaInput;
@@ -139,7 +138,7 @@ pub struct BitmaskQuadratureSource<W> {
 
 impl<W> BitmaskQuadratureSource<W>
 where
-    W: BitAnd<Output = W> + BitOr<Output = W> + Default + Copy + PartialEq,
+    W: BitAnd<Output = W> + Default + Copy + PartialOrd,
 {
     pub fn new(word: *const W, mask_a: W, mask_b: W) -> Self {
         BitmaskQuadratureSource {
@@ -153,7 +152,7 @@ where
 
 impl<W> QuadratureSource for BitmaskQuadratureSource<W>
 where
-    W: BitAnd<Output = W> + BitOr<Output = W> + Default + Copy + PartialOrd,
+    W: BitAnd<Output = W> + Default + Copy + PartialOrd,
 {
     fn pin_a(&self) -> bool {
         (unsafe { *self.word }).bitand(self.mask_a) > self.zero
