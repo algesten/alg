@@ -11,6 +11,7 @@ pub mod gen;
 pub mod input;
 pub mod pat;
 pub mod rnd;
+pub mod tempo;
 
 #[cfg(test)]
 mod drums;

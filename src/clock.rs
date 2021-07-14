@@ -141,6 +141,11 @@ impl<const FQ: u32> Time<FQ> {
 
         (rest * denom) / nom
     }
+
+    /// The number of clock cycles in this time instance.
+    pub fn count(&self) -> i64 {
+        self.count
+    }
 }
 
 impl<const FQ: u32> core::fmt::Display for Time<FQ> {
