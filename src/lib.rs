@@ -8,6 +8,7 @@ pub mod clock;
 pub mod encoder;
 pub mod euclid;
 pub mod gen;
+pub mod geom;
 pub mod input;
 pub mod pat;
 pub mod rnd;
