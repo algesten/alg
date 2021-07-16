@@ -86,6 +86,7 @@ impl Default for TrackParams {
 pub struct Generated<const X: usize> {
     pub pattern_length: u8,
     pub patterns: [Pattern; X],
+    pub rnd: Rnd,
 }
 
 impl<const X: usize> Default for Generated<X> {
@@ -122,9 +123,15 @@ impl<const X: usize> Generated<X> {
             *pat = gen.generate(params.pattern_length as usize);
         }
 
+        // reserve 64 track specific rnd before letting it go.
+        for _ in X..=64 {
+            rnd.next();
+        }
+
         Generated {
             pattern_length: params.pattern_length,
             patterns,
+            rnd,
         }
     }
 
