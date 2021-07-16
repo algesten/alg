@@ -55,6 +55,26 @@ const SIN_TABLE: &[u16] = &[
     65515, 65523, 65530, 65533, 65535,
 ];
 
+pub fn tri(offset: u32) -> i16 {
+    //
+    // /\
+    //   \/
+    //
+    // at 0              2048
+    // at 1/4 * u32::MAX 4096
+    // at 2/4 * u32::MAX 2048
+    // at 3/4 * u32::MAX 0
+    const DELTA: u32 = 1 << 15;
+
+    let n = match offset {
+        0..=1_073_741_823 => (offset / DELTA) as i32,
+        1_073_741_824..=3_221_225_471 => ((3_221_225_472 - offset) / DELTA) as i32 - 32_768,
+        _ => ((offset - 3_221_225_472) / DELTA) as i32 - 32_768,
+    };
+
+    n as i16
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -73,8 +93,12 @@ mod test {
         assert_eq!(sin(u32::MAX), 0);
     }
 
-        assert_eq!(sin(65533), -6);
-        assert_eq!(sin(65534), -3);
-        assert_eq!(sin(65535), 0);
+    #[test]
+    fn test_tri() {
+        assert_eq!(tri(0), 0);
+        assert_eq!(tri(u32::MAX / 4), 32767);
+        assert_eq!(tri(u32::MAX / 2), 0);
+        assert_eq!(tri((u32::MAX / 4) * 3), -32768);
+        assert_eq!(tri(u32::MAX), -1);
     }
 }
