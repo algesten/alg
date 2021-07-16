@@ -1,10 +1,10 @@
 /// Sinus for an angle described as 0..65535 for 0..360deg.
-pub fn sin(angle: u16) -> i16 {
+pub fn sin(angle: u32) -> i16 {
     // The lookup table goes from 0..90.
-    let t = if (angle & 0x4000) > 0 {
-        0x3fff - (angle & 0x3fff)
+    let t = if (angle & 0x4000_0000) > 0 {
+        0x3fff_ffff - (angle & 0x3fff_ffff)
     } else {
-        angle & 0x3fff
+        angle & 0x3fff_ffff
     };
 
     // the angle is interpreted like this:
@@ -13,24 +13,24 @@ pub fn sin(angle: u16) -> i16 {
     // * t is from the lookup table
     // * w is the weight between two adjacent points in the lookup table
 
-    let w = t & 0b111111;
-    let x = ((t >> 6) & 0xff) as usize;
+    let w = t & 0x3f_ffff;
+    let x = ((t >> 22) & 0xff) as usize;
     let a = SIN_TABLE[x];
     let b = SIN_TABLE[x + 1];
 
-    let r = (((b - a) * w) >> 6) + a;
+    let r = (((b as u32 - a as u32) * w) >> 22) + (a as u32);
 
     let r2 = r >> 1;
 
-    if angle & 0x8000 > 0 {
+    if angle & 0x8000_0000 > 0 {
         -(r2 as i16)
     } else {
         r2 as i16
     }
 }
 
-pub fn cos(angle: u16) -> i16 {
-    sin(angle + 0x4000)
+pub fn cos(angle: u32) -> i16 {
+    sin(angle + 0x4000_0000)
 }
 const SIN_TABLE: &[u16] = &[
     0, 402, 804, 1206, 1608, 2010, 2412, 2813, 3215, 3617, 4018, 4419, 4821, 5221, 5622, 6023,
@@ -62,23 +62,16 @@ mod test {
     #[test]
     fn test_sin() {
         assert_eq!(sin(0), 0);
-        assert_eq!(sin(1), 3);
-        assert_eq!(sin(2), 6);
-        assert_eq!(sin(3), 9);
+        assert_eq!(sin(30_000), 1);
+        assert_eq!(sin(60_000), 2);
+        assert_eq!(sin(80_000), 3);
+        assert_eq!(sin(90_000), 4);
 
-        assert_eq!(sin(16_383), 32767);
-        assert_eq!(sin(16_384), 32767);
-        assert_eq!(sin(16_385), 32767);
-
-        assert_eq!(sin(32_765), 6);
-        assert_eq!(sin(32_766), 3);
-        assert_eq!(sin(32_767), 0);
-        assert_eq!(sin(32_765), 6);
-        assert_eq!(sin(32_766), 3);
-
-        assert_eq!(sin(49_151), -32767);
-        assert_eq!(sin(49_152), -32767);
-        assert_eq!(sin(49_153), -32767);
+        assert_eq!(sin(u32::MAX / 4), 32767);
+        assert_eq!(sin(u32::MAX / 2), 0);
+        assert_eq!(sin((u32::MAX / 4) * 3), -32767);
+        assert_eq!(sin(u32::MAX), 0);
+    }
 
         assert_eq!(sin(65533), -6);
         assert_eq!(sin(65534), -3);
