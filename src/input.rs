@@ -5,13 +5,13 @@ use crate::clock::Time;
 /// An input that produces deltas. Think rotary encoder that will give us
 /// -1, 0 or 1.
 pub trait DeltaInput<const CLK: u32> {
-    /// Polled every main-loop run. Returns 0 as long as there isn't a value.
+    /// Polled when needed run. Returns 0 as long as there isn't a value.
     fn tick(&mut self, now: Time<CLK>) -> i8;
 }
 
 /// An input that is either high or low.
 pub trait DigitalInput<const CLK: u32> {
-    /// Polled every main-loop run. The time returned does not have to be `now`, it can be
+    /// Polled when needed. The time returned does not have to be `now`, it can be
     /// some time in the past when having debounce logic to ensure the state really is
     /// high or low.
     fn tick(&mut self, now: Time<CLK>) -> HiLo<CLK>;
@@ -91,7 +91,7 @@ impl<const CLK: u32> HiLo<CLK> {
 /// Trait for inputs that switches between low/high now and then. Used when we want to
 /// detect the "edge" of switching from high to low or vice versa.
 pub trait EdgeInput<const CLK: u32> {
-    /// Polled every main-loop run. Returns None as long as there isn't a change in the input.
+    /// Polled when needed. Returns None as long as there isn't a change in the input.
     fn tick(&mut self, now: Time<CLK>) -> Option<Edge<CLK>>;
 }
 
