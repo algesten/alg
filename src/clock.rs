@@ -97,6 +97,13 @@ impl<const FQ: u32> Time<FQ> {
         }
     }
 
+    // Create a new instance converted from a number of microseconds.
+    pub const fn from_micros(micros: i64) -> Self {
+        Time {
+            count: (micros * FQ as i64) / 1000_000,
+        }
+    }
+
     // Create a new instance converted from a number of milliseconds.
     pub const fn from_nanos(nanos: i64) -> Self {
         Time {
