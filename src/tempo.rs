@@ -2,14 +2,15 @@ use crate::clock::Time;
 
 /// Simple tempo detection.
 ///
-/// Saves measured beat (clock pulse) intervals into a 16 big array. The assumption is that
+/// Saves measured beat (clock pulse) intervals into an array. The assumption is that
 /// a potential swing would be on every other beat (offbeat), which means we can make linear
 /// regression either over the odd or the even positions in the array to predict the next
 /// interval.
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct Tempo<const CLK: u32> {
-    intervals: [Option<Time<CLK>>; 16],
+    intervals: [Option<Time<CLK>>; 6],
     next: usize,
+    predicted: i64,
 }
 
 impl<const CLK: u32> Tempo<CLK> {
@@ -38,6 +39,27 @@ impl<const CLK: u32> Tempo<CLK> {
             self.next = self.next % 2;
         }
 
+        if self.predicted > 0 && interval.count() > 10 * self.predicted {
+            // The interval is much longer than predicted. Assume there was a stop
+            // in the clock pulse, which happens when the user stops the sequencer
+            // or similar.
+
+            // We do a little switch-a-roo hoping we get back to the predicted speed.
+            // If this is indeed the new speed, we will accept it on next clock tick.
+            let guessed = Time {
+                count: self.predicted,
+            };
+
+            // Use the one we guess instead of incoming.
+            self.intervals[self.next] = Some(guessed);
+            self.next += 1;
+
+            // By saving incoming here, we will accept the next incoming if it has a similar interval.
+            self.predicted = interval.count();
+
+            return guessed;
+        }
+
         self.intervals[self.next] = Some(interval);
         self.next += 1;
 
@@ -52,6 +74,7 @@ impl<const CLK: u32> Tempo<CLK> {
         let (b0, b1) = self.linear_regress();
 
         let predicted = b0 + b1 * (self.next as i64);
+        self.predicted = predicted;
 
         Time {
             count: if predicted == 0 {
