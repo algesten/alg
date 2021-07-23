@@ -190,6 +190,13 @@ where
     }
 }
 
+impl Pat<u8> {
+    pub fn density(&self) -> u8 {
+        let x = self.repeat_to(64);
+        x.0.iter().filter(|x| **x > 0).count() as u8 * 2
+    }
+}
+
 impl PartialEq<&str> for Pat<u8> {
     fn eq(&self, other: &&str) -> bool {
         let trim = trim_pattern(other);

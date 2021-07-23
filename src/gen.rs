@@ -16,25 +16,33 @@ pub const STOKAST_PARAMS: Params<4> = Params {
             steps: 0,
             length: 16,
             offset: 0,
-            density: 30,
+            density: 35,
+            subdiv: 3,
+            banned: &[3, 5],
         },
         TrackParams {
             steps: 0,
             length: 32,
             offset: 4,
             density: 30,
+            subdiv: 3,
+            banned: &[],
         },
         TrackParams {
             steps: 0,
             length: 24,
             offset: 2,
             density: 80,
+            subdiv: 4,
+            banned: &[],
         },
         TrackParams {
             steps: 0,
             length: 32,
             offset: 2,
             density: 50,
+            subdiv: 4,
+            banned: &[],
         },
     ],
 };
@@ -69,6 +77,10 @@ pub struct TrackParams {
     pub offset: u8,
     /** density/127 multiplication factor for random steps. */
     pub density: u8,
+    /** Chance to do subdivision. 3 would mean 1/3. */
+    pub subdiv: u32,
+    /** Steps that are "banned". */
+    pub banned: &'static [u8],
 }
 
 impl Default for TrackParams {
@@ -78,6 +90,8 @@ impl Default for TrackParams {
             steps: 0,
             offset: 0,
             density: 0,
+            subdiv: 0,
+            banned: &[],
         }
     }
 }
@@ -120,7 +134,13 @@ impl<const X: usize> Generated<X> {
                 params: params.tracks[i],
             };
 
-            *pat = generate(gen.seed, &gen.params, params.pattern_length as usize);
+            *pat = generate(
+                gen.seed,
+                &gen.params,
+                params.pattern_length as usize,
+                true,
+                true,
+            );
         }
 
         // reserve 64 track specific rnd before letting it go.
@@ -140,7 +160,13 @@ impl<const X: usize> Generated<X> {
     }
 }
 
-fn generate(seed: u32, params: &TrackParams, pattern_length: usize) -> Pattern {
+fn generate(
+    seed: u32,
+    params: &TrackParams,
+    pattern_length: usize,
+    allow_subdivision: bool,
+    use_banned: bool,
+) -> Pattern {
     let mut rnd = Rnd::new(seed);
 
     if params.length == 0 {
@@ -178,32 +204,54 @@ fn generate(seed: u32, params: &TrackParams, pattern_length: usize) -> Pattern {
     {
         // If the range is possible to subdivide by 4 or 2 to get something in the range of 6-8,
         // we _sometimes_ do that to create variation.
-        const SUBDIVIDE: &[u32] = &[4, 2];
+        const SUBDIVIDE: &[u32] = &[1, 4, 2];
 
         let x = rnd.next();
+        let y = rnd.next();
 
-        for sub in SUBDIVIDE {
-            if range % *sub == 0 {
-                // 33% of the time, if we are in random mode.
-                if params.steps == 0 && x < u32::MAX / 3 {
-                    let len = range / *sub;
-                    if len == 8 || len == 6 {
-                        // let's do it!
-                        let mut new_params = TrackParams {
-                            length: len as u8,
-                            offset: 0,
-                            ..*params
-                        };
+        if params.steps == 0 && allow_subdivision && params.subdiv > 0 {
+            for sub in SUBDIVIDE {
+                if range % *sub == 0 {
+                    if x < (u32::MAX / params.subdiv) {
+                        // If this length is an even multiple of 16, 8 or 6.
+                        let length = (range / *sub) as usize;
 
-                        let p1 = generate(x, &new_params, len as usize);
+                        if length == 16 || length == 8 || length == 6 {
+                            // let's do it!
+                            let mut new_params = TrackParams {
+                                length: length as u8,
+                                offset: 0,
+                                ..*params
+                            };
 
-                        new_params.density = params.density * 2;
-                        let p2 = generate(x + 1, &new_params, len as usize);
+                            let p1 = generate(x, &new_params, length, false, true);
 
-                        // This is the whole point.
-                        let combined = p1 + p2;
+                            new_params.density = params.density.wrapping_mul(2);
+                            let p2 = generate(x + 1, &new_params, length, false, false);
 
-                        return combined.offset(params.offset).repeat_to(pattern_length);
+                            // Occassionally we will do:
+                            // p1-p2-p1-p2
+                            // and sometimes:
+                            // p1-p2-p1-p3
+                            let p3 = generate(x + 2, &new_params, length, false, false);
+
+                            // Use the one with most density as last.
+                            let (p2, p3) = if p2.density() > p3.density() {
+                                (p3, p2)
+                            } else {
+                                (p2, p3)
+                            };
+
+                            // This is the whole point.
+                            let combined = if y < u32::MAX / 3 {
+                                p1 + p2 + p1 + p3
+                            } else {
+                                // Most of the time, we just alternate two patterns.
+                                p1 + p2
+                            };
+
+                            return combined.offset(params.offset).repeat_to(pattern_length);
+                        }
                     }
                 }
             }
@@ -220,7 +268,17 @@ fn generate(seed: u32, params: &TrackParams, pattern_length: usize) -> Pattern {
             (unweighted * params.density as u32) / 127
         };
 
-        (weighted as u8) + 1
+        let mut proposed = (weighted as u8) + 1;
+
+        // The banned functionality is a mechanism to not have 3 and 5 as random number of the
+        // stuff like the bassdrum.
+        if use_banned {
+            while params.banned.contains(&proposed) {
+                proposed += 1;
+            }
+        }
+
+        proposed
     };
 
     let steps = if params.steps == 0 {
