@@ -65,6 +65,16 @@ where
         }
     }
 
+    /// Set the value at `index`.
+    pub fn set(&mut self, mut index: isize, v: T) {
+        while index < 0 {
+            index += self.1 as isize;
+        }
+        let index = index as usize % self.1;
+
+        self.0[index] = v;
+    }
+
     /// Make a copy of self where each value is `offset` to the right. Values pushed
     /// off the end to right wraps around and comes in at the beginning.
     ///

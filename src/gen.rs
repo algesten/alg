@@ -6,7 +6,7 @@ const DEFAULT_PATTERN_LEN: u8 = 64;
 const DEFAULT_TRACK_LEN: u8 = 64;
 
 /// Base for seed since starting at 0 is so boring.
-pub const SEED_BASE: i32 = 0x4164c47;
+pub const SEED_BASE: i32 = 0x4144c47;
 
 pub const STOKAST_PARAMS: Params<4> = Params {
     seed: SEED_BASE as u32,
@@ -202,60 +202,94 @@ fn generate(
     };
 
     {
-        // If the range is possible to subdivide by 4 or 2 to get something in the range of 6-8,
-        // we _sometimes_ do that to create variation.
-        const SUBDIVIDE: &[u32] = &[1, 4, 2];
-
         let x = rnd.next();
         let y = rnd.next();
+        let a = rnd.next();
+        let b = rnd.next();
 
-        if params.steps == 0 && allow_subdivision && params.subdiv > 0 {
-            for sub in SUBDIVIDE {
-                if range % *sub == 0 {
-                    if x < (u32::MAX / params.subdiv) {
-                        // If this length is an even multiple of 16, 8 or 6.
-                        let length = (range / *sub) as usize;
+        let do_subdivide = allow_subdivision // if it is allowed
+            && params.steps == 0                  // the steps are indeed set to random
+            && params.subdiv > 0                  // the params indicate there can be subdivision
+            && x < u32::MAX / params.subdiv; // and the chance is on our side
 
-                        if length == 16 || length == 8 || length == 6 {
-                            // let's do it!
-                            let mut new_params = TrackParams {
-                                length: length as u8,
-                                offset: 0,
-                                ..*params
-                            };
+        if do_subdivide {
+            // The subdivisions we will attempt.
+            const SUBDIVIDE: &[usize] = &[32, 24, 16, 8, 6, 4];
 
-                            let p1 = generate(x, &new_params, length, false, true);
+            for length in SUBDIVIDE {
+                // Must divide evenly, and actually divide (not == 1)
+                let l_u32 = *length as u32;
+                if range % l_u32 != 0 || range / l_u32 <= 1 {
+                    continue;
+                }
 
-                            new_params.density = params.density.wrapping_mul(2);
-                            let p2 = generate(x + 1, &new_params, length, false, false);
+                // let's do it!
+                let mut new_params = TrackParams {
+                    length: *length as u8,
+                    offset: 0,
+                    ..*params
+                };
 
-                            // Occassionally we will do:
-                            // p1-p2-p1-p2
-                            // and sometimes:
-                            // p1-p2-p1-p3
-                            let p3 = generate(x + 2, &new_params, length, false, false);
+                let mut p1 = generate(x, &new_params, *length, false, true);
 
-                            // Use the one with most density as last.
-                            let (p2, p3) = if p2.density() > p3.density() {
-                                (p3, p2)
-                            } else {
-                                (p2, p3)
-                            };
+                new_params.density = params.density.wrapping_mul(2);
+                let mut p2 = generate(x + 1, &new_params, *length, false, false);
 
-                            // This is the whole point.
-                            let combined = if y < u32::MAX / 3 {
-                                p1 + p2 + p1 + p3
-                            } else {
-                                // Most of the time, we just alternate two patterns.
-                                p1 + p2
-                            };
+                // Occassionally we will do:
+                // p1-p2-p1-p2
+                // and sometimes:
+                // p1-p2-p1-p3
+                let mut p3 = generate(x + 2, &new_params, *length, false, false);
 
-                            return combined.offset(params.offset).repeat_to(pattern_length);
+                // Sometimes we add extra beats.
+                if a < u32::MAX / 3 {
+                    // 8 positions:
+                    // - p1 -  .... - p2 - .... - p3 -
+                    // 0 1 2        3 4  5      6 7  8
+                    let mut pos = (b / (u32::MAX / 8)) as isize;
+
+                    if pos <= 2 {
+                        if pos == 1 {
+                            pos -= 1;
                         }
+                        p1.set(pos - 1, 70);
+                    } else if pos <= 5 {
+                        if pos == 4 {
+                            pos -= 1;
+                        }
+                        p2.set(pos - 4, 70);
+                    } else {
+                        if pos == 7 {
+                            pos -= 1;
+                        }
+                        p3.set(pos - 7, 70);
                     }
                 }
+
+                // Use the one with most density as last.
+                let (p2, p3) = if p2.density() > p3.density() {
+                    (p3, p2)
+                } else {
+                    (p2, p3)
+                };
+
+                // This is the whole point.
+                let combined = if y < u32::MAX / 3 {
+                    p1 + p2 + p1 + p3
+                } else {
+                    // Most of the time, we just alternate two patterns.
+                    p1 + p2
+                };
+
+                return combined.offset(params.offset).repeat_to(pattern_length);
             }
         }
+    }
+
+    {
+        let x = rnd.next();
+
+        if x < u32::MAX / 8 {}
     }
 
     // important to generate this also when it's not used since we need rnd.next() every time.
