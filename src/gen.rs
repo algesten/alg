@@ -16,6 +16,7 @@ pub const STOKAST_PARAMS: Params<4> = Params {
             steps: 0,
             length: 16,
             offset: 0,
+            offset_double: 0,
             density: 35,
             subdiv: 3,
             rare: &[3, 5],
@@ -24,14 +25,16 @@ pub const STOKAST_PARAMS: Params<4> = Params {
             steps: 0,
             length: 32,
             offset: 4,
+            offset_double: 3,
             density: 30,
             subdiv: 3,
-            rare: &[5, 7],
+            rare: &[3, 5, 7],
         },
         TrackParams {
             steps: 0,
             length: 24,
             offset: 2,
+            offset_double: 5,
             density: 80,
             subdiv: 4,
             rare: &[],
@@ -40,6 +43,7 @@ pub const STOKAST_PARAMS: Params<4> = Params {
             steps: 0,
             length: 32,
             offset: 2,
+            offset_double: 10,
             density: 50,
             subdiv: 4,
             rare: &[],
@@ -49,11 +53,11 @@ pub const STOKAST_PARAMS: Params<4> = Params {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Params<const X: usize> {
-    /** Random seed to generate all randomness from. */
+    /// Random seed to generate all randomness from. */
     pub seed: u32,
-    /** Length of the entire pattern. */
+    /// Length of the entire pattern. */
     pub pattern_length: u8,
-    /** Parameters per track */
+    /// Parameters per track */
     pub tracks: [TrackParams; X],
 }
 
@@ -69,17 +73,19 @@ impl<const X: usize> Default for Params<X> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TrackParams {
-    /** Length of track. In clock-ticks. */
+    /// Length of track. In clock-ticks.
     pub length: u8,
-    /** Number of euclidean steps. 0 to use a random number. */
+    /// Number of euclidean steps. 0 to use a random number.
     pub steps: u8,
-    /** Offset of euclidean steps. */
+    /// Offset of euclidean steps.
     pub offset: u8,
-    /** density/127 multiplication factor for random steps. */
+    /// Chance of doubling the offset. 4 means 1/4.
+    pub offset_double: u8,
+    /// density/127 multiplication factor for random steps.
     pub density: u8,
-    /** Chance to do subdivision. 3 would mean 1/3. */
+    /// Chance to do subdivision. 3 would mean 1/3.
     pub subdiv: u32,
-    /** Steps that we don't want much of. */
+    /// Steps that we don't want much of.
     pub rare: &'static [u8],
 }
 
@@ -89,6 +95,7 @@ impl Default for TrackParams {
             length: DEFAULT_TRACK_LEN,
             steps: 0,
             offset: 0,
+            offset_double: 0,
             density: 0,
             subdiv: 0,
             rare: &[],
@@ -294,7 +301,21 @@ fn generate(
         }
     }
 
-    rnd.next(); // TODO: use me.
+    // Offset randomization. This is sowe don't always get snare on the second beat.
+    let mut offset = params.offset;
+    {
+        let x = rnd.next();
+
+        // if we are randomizing
+        if params.steps == 0
+        // and there is a setting for this track
+            && params.offset_double > 0
+            // sometimes double the offset.
+            && x < u32::MAX / (params.offset_double as u32)
+        {
+            offset *= 2;
+        }
+    }
 
     // important to generate this also when it's not used since we need rnd.next() every time.
     let random_steps = loop {
@@ -311,7 +332,7 @@ fn generate(
 
         // The rare functionality is a mechanism to not have too much  3 and 5 as steps
         // of the bassdrum or snare.
-        let is_rare = r < u32::MAX / 20;
+        let is_rare = r < u32::MAX / 10;
         if enforce_rare && params.rare.contains(&proposed) && !is_rare {
             continue;
         }
@@ -326,7 +347,7 @@ fn generate(
     };
 
     euclid(steps, length)
-        .offset(params.offset)
+        .offset(offset)
         .repeat_to(pattern_length)
 }
 
