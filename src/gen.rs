@@ -111,13 +111,6 @@ impl<const X: usize> Default for Generated<X> {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-struct TrackGenerator {
-    /** Seed per track to not change depending on global seed. */
-    seed: u32,
-    params: TrackParams,
-}
-
 impl<const X: usize> Generated<X> {
     pub fn new(params: Params<X>) -> Self {
         assert!(params.pattern_length > 0);
@@ -127,20 +120,35 @@ impl<const X: usize> Generated<X> {
 
         let mut patterns: [Pattern; X] = [Pattern::default(); X];
 
-        for (i, pat) in patterns.iter_mut().enumerate() {
-            let gen = TrackGenerator {
-                // mix in track index to not get the same patterns in all tracks
-                seed: rnd.next() + (i as u32),
-                params: params.tracks[i],
-            };
+        for i in 0..X {
+            let mut seed = rnd.next() + (i as u32);
 
-            *pat = generate(
-                gen.seed,
-                &gen.params,
-                params.pattern_length as usize,
-                true,
-                true,
-            );
+            'redo: loop {
+                // generate pattern for this index.
+                patterns[i] = generate(
+                    seed,
+                    &params.tracks[i],
+                    params.pattern_length as usize,
+                    true,
+                    true,
+                );
+
+                // ensure we didn't end up with something that is exactly like
+                // what we already have.
+                let p = &patterns[i];
+                for j in 0..i {
+                    if j == i {
+                        continue;
+                    }
+                    if p == &patterns[j] {
+                        // pattern is exactly same as something else. redo it.
+                        seed += 1;
+                        continue 'redo;
+                    }
+                }
+
+                break;
+            }
         }
 
         // reserve 64 track specific rnd before letting it go.
