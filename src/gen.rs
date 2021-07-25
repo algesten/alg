@@ -18,7 +18,7 @@ pub const STOKAST_PARAMS: Params<4> = Params {
             offset: 0,
             density: 35,
             subdiv: 3,
-            banned: &[3, 5],
+            rare: &[3, 5],
         },
         TrackParams {
             steps: 0,
@@ -26,7 +26,7 @@ pub const STOKAST_PARAMS: Params<4> = Params {
             offset: 4,
             density: 30,
             subdiv: 3,
-            banned: &[],
+            rare: &[5, 7],
         },
         TrackParams {
             steps: 0,
@@ -34,7 +34,7 @@ pub const STOKAST_PARAMS: Params<4> = Params {
             offset: 2,
             density: 80,
             subdiv: 4,
-            banned: &[],
+            rare: &[],
         },
         TrackParams {
             steps: 0,
@@ -42,7 +42,7 @@ pub const STOKAST_PARAMS: Params<4> = Params {
             offset: 2,
             density: 50,
             subdiv: 4,
-            banned: &[],
+            rare: &[],
         },
     ],
 };
@@ -79,8 +79,8 @@ pub struct TrackParams {
     pub density: u8,
     /** Chance to do subdivision. 3 would mean 1/3. */
     pub subdiv: u32,
-    /** Steps that are "banned". */
-    pub banned: &'static [u8],
+    /** Steps that we don't want much of. */
+    pub rare: &'static [u8],
 }
 
 impl Default for TrackParams {
@@ -91,7 +91,7 @@ impl Default for TrackParams {
             offset: 0,
             density: 0,
             subdiv: 0,
-            banned: &[],
+            rare: &[],
         }
     }
 }
@@ -165,7 +165,7 @@ fn generate(
     params: &TrackParams,
     pattern_length: usize,
     allow_subdivision: bool,
-    use_banned: bool,
+    enforce_rare: bool,
 ) -> Pattern {
     let mut rnd = Rnd::new(seed);
 
@@ -286,15 +286,12 @@ fn generate(
         }
     }
 
-    {
-        let x = rnd.next();
-
-        if x < u32::MAX / 8 {}
-    }
+    rnd.next(); // TODO: use me.
 
     // important to generate this also when it's not used since we need rnd.next() every time.
-    let random_steps = {
-        let unweighted = rnd.next() / (u32::max_value() / range);
+    let random_steps = loop {
+        let r = rnd.next();
+        let unweighted = r / (u32::MAX / range);
 
         let weighted = if params.density == 0 {
             unweighted
@@ -302,17 +299,16 @@ fn generate(
             (unweighted * params.density as u32) / 127
         };
 
-        let mut proposed = (weighted as u8) + 1;
+        let proposed = (weighted as u8) + 1;
 
-        // The banned functionality is a mechanism to not have 3 and 5 as random number of the
-        // stuff like the bassdrum.
-        if use_banned {
-            while params.banned.contains(&proposed) {
-                proposed += 1;
-            }
+        // The rare functionality is a mechanism to not have too much  3 and 5 as steps
+        // of the bassdrum or snare.
+        let is_rare = r < u32::MAX / 20;
+        if enforce_rare && params.rare.contains(&proposed) && !is_rare {
+            continue;
         }
 
-        proposed
+        break proposed;
     };
 
     let steps = if params.steps == 0 {
