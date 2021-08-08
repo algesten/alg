@@ -11,9 +11,7 @@ pub trait DeltaInput<const CLK: u32> {
 
 /// An input that is either high or low.
 pub trait DigitalInput<const CLK: u32> {
-    /// Polled when needed. The time returned does not have to be `now`, it can be
-    /// some time in the past when having debounce logic to ensure the state really is
-    /// high or low.
+    /// Polled when needed.
     fn tick(&mut self, now: Time<CLK>) -> HiLo<CLK>;
 }
 
@@ -57,6 +55,22 @@ where
 pub enum HiLo<const CLK: u32> {
     Hi(Time<CLK>),
     Lo(Time<CLK>),
+}
+
+impl<const CLK: u32> HiLo<CLK> {
+    pub fn is_same_state(&self, other: &HiLo<CLK>) -> bool {
+        match (self, other) {
+            (HiLo::Hi(_), HiLo::Hi(_)) | (HiLo::Lo(_), HiLo::Lo(_)) => true,
+            _ => false,
+        }
+    }
+
+    pub fn time(&self) -> &Time<CLK> {
+        match self {
+            HiLo::Hi(v) => v,
+            HiLo::Lo(v) => v,
+        }
+    }
 }
 
 impl<const CLK: u32> PartialEq for HiLo<CLK> {
@@ -111,15 +125,10 @@ impl<I, const CLK: u32> DigitalEdgeInput<I, CLK>
 where
     I: DigitalInput<CLK>,
 {
-    pub fn new(input: I, start_high: bool) -> Self {
-        DigitalEdgeInput {
-            input,
-            value: if start_high {
-                HiLo::Hi(Time::ZERO)
-            } else {
-                HiLo::Lo(Time::ZERO)
-            },
-        }
+    pub fn new(mut input: I) -> Self {
+        let value = input.tick(Time::ZERO);
+
+        DigitalEdgeInput { input, value }
     }
 }
 
@@ -162,5 +171,36 @@ impl<const CLK: u32> DigitalInput<CLK> for () {
 impl<const CLK: u32> EdgeInput<CLK> for () {
     fn tick(&mut self, _now: Time<CLK>) -> Option<Edge<CLK>> {
         None
+    }
+}
+
+pub struct DebounceDigitalInput<I, const CLK: u32> {
+    input: I,
+    value: HiLo<CLK>,
+}
+impl<I, const CLK: u32> DebounceDigitalInput<I, CLK>
+where
+    I: DigitalInput<CLK>,
+{
+    pub fn new(mut input: I) -> Self {
+        let value = input.tick(Time::ZERO);
+        DebounceDigitalInput { input, value }
+    }
+}
+
+impl<I, const CLK: u32> DigitalInput<CLK> for DebounceDigitalInput<I, CLK>
+where
+    I: DigitalInput<CLK>,
+{
+    fn tick(&mut self, now: Time<CLK>) -> HiLo<CLK> {
+        let value = self.input.tick(now);
+
+        if !self.value.is_same_state(&value) {
+            if now - *self.value.time() > Time::from_millis(1) {
+                self.value = value;
+            }
+        }
+
+        return self.value;
     }
 }
