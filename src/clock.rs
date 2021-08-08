@@ -47,6 +47,24 @@ where
         self.lower = cur;
     }
 
+    /// Given a u32 cycle count, get Time using the "knowledge" of where the
+    /// time is in this clock. I.e. if the time wraps around,
+    /// we get a correct time for that.
+    pub fn time_relative(&self, cycle_count: u32) -> Time<FQ> {
+        const HALF: u32 = 2_u32.pow(31);
+
+        let upper = if cycle_count < HALF && self.lower > HALF {
+            // looped around.
+            self.upper + 1
+        } else {
+            self.upper
+        };
+
+        Time {
+            count: ((upper as i64) << 32) | (cycle_count as i64),
+        }
+    }
+
     /// Get the current time. This is reasonably called _after_ `tick()`.
     pub fn now(&self) -> Time<FQ> {
         Time {
