@@ -129,9 +129,19 @@ impl<const X: usize> Generated<X> {
 
         for i in 0..X {
             let mut seed = rnd.next() + (i as u32);
+            let mut redo_sanity_check = 0;
 
             'redo: loop {
+                redo_sanity_check += 1;
+                if redo_sanity_check >= 50 {
+                    panic!("generate: redo loop runaway");
+                }
+
                 // generate pattern for this index.
+                debug!(
+                    "Generate track: {} seed: {} params: {:?}",
+                    i, seed, &params.tracks[i]
+                );
                 patterns[i] = generate(
                     seed,
                     &params.tracks[i],
@@ -140,9 +150,15 @@ impl<const X: usize> Generated<X> {
                     true,
                 );
 
-                // ensure we didn't end up with something that is exactly like
-                // what we already have.
+                // if we are not randomizing, whatever we got is fine.
+                if params.tracks[i].steps > 0 {
+                    break;
+                }
+
+                // since we randomized, ensure we didn't end up with something that is exactly
+                // like what we already have.
                 let p = &patterns[i];
+
                 for j in 0..i {
                     if j == i {
                         continue;
@@ -229,7 +245,8 @@ fn generate(
 
         if do_subdivide {
             // The subdivisions we will attempt.
-            const SUBDIVIDE: &[usize] = &[32, 24, 16, 8, 6, 4];
+            // These subdivisions must be possible to do 4x and still be below MAX_LEN (64).
+            const SUBDIVIDE: &[usize] = &[16, 8, 6, 4];
 
             for length in SUBDIVIDE {
                 // Must divide evenly, and actually divide (not == 1)
