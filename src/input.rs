@@ -10,9 +10,19 @@ pub trait DeltaInput<const CLK: u32> {
 }
 
 /// An input that is either high or low.
-pub trait DigitalInput<const CLK: u32> {
+pub trait DigitalInput<const CLK: u32>: Sized {
     /// Polled when needed.
     fn tick(&mut self, now: Time<CLK>) -> HiLo<CLK>;
+
+    /// Wrap this source input in a debouncer.
+    fn debounce(self) -> DebounceDigitalInput<Self, CLK> {
+        DebounceDigitalInput::new(self)
+    }
+
+    /// Turns this input into an edge sensing input.
+    fn edge(self) -> DigitalEdgeInput<Self, CLK> {
+        DigitalEdgeInput::new(self)
+    }
 }
 
 /// Digital input over reading a pointer to a shared number.
@@ -174,6 +184,7 @@ impl<const CLK: u32> EdgeInput<CLK> for () {
     }
 }
 
+/// Input that debounces the input to avoid unintentional double clicks.
 pub struct DebounceDigitalInput<I, const CLK: u32> {
     input: I,
     value: HiLo<CLK>,
