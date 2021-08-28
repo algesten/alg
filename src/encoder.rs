@@ -72,6 +72,7 @@ pub struct Encoder<T> {
     quad: T,
     prev_next: u8,
     state: u8,
+    last_pos: isize,
 }
 
 impl<T> Encoder<T> {
@@ -81,6 +82,7 @@ impl<T> Encoder<T> {
             quad,
             prev_next: 0,
             state: 0,
+            last_pos: 4,
         }
     }
 }
@@ -90,16 +92,26 @@ where
     T: QuadratureSource,
 {
     fn tick(&mut self, _now: Time<CLK>) -> i8 {
-        // Rotate up last read 2 bits and discard the rest.
-        self.prev_next = (self.prev_next << 2) & 0b1100;
+        let mut cur = 0;
 
         if self.quad.pin_a() {
-            self.prev_next |= 0b10;
+            cur |= 0b10;
         }
 
         if self.quad.pin_b() {
-            self.prev_next |= 0b01;
+            cur |= 0b01;
         }
+
+        if (self.prev_next & 0b11) == cur {
+            // no change
+            return 0;
+        }
+
+        // Rotate up last read 2 bits and discard the rest.
+        self.prev_next = (self.prev_next << 2) & 0b1100;
+
+        // insert new reading
+        self.prev_next |= cur;
 
         let direction = TABLE[self.prev_next as usize];
 
@@ -107,14 +119,33 @@ where
             // Move current state up to make state for new, and put in the new.
             self.state = (self.state << 4) | self.prev_next;
 
-            // A CCW rotation will always pass through this state
-            if self.state == 0b1110_1000 {
-                return -1;
-            }
+            // The possible state to observe when going CCW
+            const STATE_CCW: &[u8] = &[0b10000001, 0b00010111, 0b01111110, 0b11101000];
 
-            // A CW rotation will always pass through this state
-            if self.state == 0b1101_0100 {
-                return 1;
+            // The possible state to observe when going CW
+            const STATE_CW: &[u8] = &[0b01000010, 0b00101011, 0b10111101, 0b11010100];
+
+            let pos = {
+                if let Some(pos) = STATE_CW.iter().position(|s| s == &self.state) {
+                    Some(pos as isize)
+                } else if let Some(pos) = STATE_CCW.iter().position(|s| s == &self.state) {
+                    Some(-1 * pos as isize)
+                } else {
+                    None
+                }
+            };
+
+            if let Some(pos) = pos {
+                // If the polarity changes or we jump to a lower position in the
+                // table, we are on a new turn.
+                let is_new_turn =
+                    pos.signum() != self.last_pos.signum() || pos.abs() < self.last_pos.abs();
+
+                self.last_pos = pos;
+
+                if is_new_turn {
+                    return pos.signum() as i8;
+                }
             }
         }
 
