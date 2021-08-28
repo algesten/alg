@@ -155,6 +155,13 @@ impl<const FQ: u32> Time<FQ> {
         (rest * denom) / nom
     }
 
+    /// Rebase this timestamp to some other base.
+    pub fn rebase<const FQ2: u32>(&self) -> Time<FQ2> {
+        Time {
+            count: (self.count * FQ2 as i64) / FQ as i64,
+        }
+    }
+
     /// Fractional seconds in nanoseconds. I.e. if time is 500E6 and clock frequency is 600E6,
     /// this function returns 833_333_333.
     pub fn subsec_nanos(&self) -> i64 {
@@ -181,7 +188,7 @@ impl<const FQ: u32> core::fmt::Display for Time<FQ> {
 
 impl<const FQ: u32> core::fmt::Debug for Time<FQ> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "Time {{ {:08x} }}", self.count)
+        write!(f, "Time {{ {}/{} }}", self.count, FQ)
     }
 }
 
