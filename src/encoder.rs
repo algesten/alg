@@ -127,9 +127,9 @@ where
 
             let pos = {
                 if let Some(pos) = STATE_CW.iter().position(|s| s == &self.state) {
-                    Some(pos as isize)
+                    Some(pos as isize + 1)
                 } else if let Some(pos) = STATE_CCW.iter().position(|s| s == &self.state) {
-                    Some(-1 * pos as isize)
+                    Some(-1 * pos as isize - 1)
                 } else {
                     None
                 }
@@ -138,8 +138,7 @@ where
             if let Some(pos) = pos {
                 // If the polarity changes or we jump to a lower position in the
                 // table, we are on a new turn.
-                let is_new_turn =
-                    pos.signum() != self.last_pos.signum() || pos.abs() <= self.last_pos.abs();
+                let is_new_turn = pos.abs() == 1 && self.last_pos.abs() != 1;
 
                 self.last_pos = pos;
 
