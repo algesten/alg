@@ -139,7 +139,7 @@ where
                 // If the polarity changes or we jump to a lower position in the
                 // table, we are on a new turn.
                 let is_new_turn =
-                    pos.signum() != self.last_pos.signum() || pos.abs() < self.last_pos.abs();
+                    pos.signum() != self.last_pos.signum() || pos.abs() <= self.last_pos.abs();
 
                 self.last_pos = pos;
 
