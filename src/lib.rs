@@ -14,6 +14,9 @@ pub mod pat;
 pub mod rnd;
 pub mod tempo;
 
+#[cfg(feature = "float")]
+pub mod wave;
+
 #[cfg(test)]
 mod drums;
 

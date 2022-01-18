@@ -4,6 +4,10 @@ version = "0.1.0"
 authors = ["Martin Algesten <martin@algesten.se>"]
 edition = "2021"
 
+[features]
+default = ["float"]
+float = []
+
 [dependencies]
 gcd = "2"
 log = "0.4"
