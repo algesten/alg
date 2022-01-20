@@ -26,10 +26,10 @@ pub struct WaveTableBuffer<W1: WaveTable, W2: WaveTable, const LEN: usize, const
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WaveTableParams {
     /// Offset between two wavetables.
-    offset: f32,
+    pub offset: f32,
 
     /// Frequency to play in Hz.
-    freq: f32,
+    pub freq: f32,
 }
 
 impl<W1: WaveTable, W2: WaveTable, const LEN: usize, const FQ: u32>
@@ -43,7 +43,7 @@ impl<W1: WaveTable, W2: WaveTable, const LEN: usize, const FQ: u32>
         let time = Time::new(-1 * LEN as i64);
 
         let params = WaveTableParams {
-            offset: 1.0,
+            offset: 0.0,
             freq: 440.0,
         };
 
@@ -69,6 +69,10 @@ impl<W1: WaveTable, W2: WaveTable, const LEN: usize, const FQ: u32>
 
     pub fn buffer(&self) -> &[f32] {
         &self.buffer
+    }
+
+    pub fn params(&self) -> &WaveTableParams {
+        &self.params
     }
 
     pub fn set_params(&mut self, params: WaveTableParams) {
@@ -383,4 +387,21 @@ mod test {
             )
         }
     }
+
+    // #[test]
+    // fn test_wt_buf() {
+    //     let wt1 = BasicWavetable::Saw;
+    //     let wt2 = BasicWavetable::Square;
+
+    //     let mut wt_buf = WaveTableBuffer::<_, _, 256, 44_000>::new(wt1, wt2);
+
+    //     let mut params = *wt_buf.params();
+    //     params.freq = 439.0;
+
+    //     wt_buf.set_params(params);
+
+    //     wt_buf.advance_time();
+
+    //     assert_eq!(wt_buf.buffer(), &[]);
+    // }
 }
