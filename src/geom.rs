@@ -1,4 +1,4 @@
-/// Sinus for an angle described as 0..65535 for 0..360deg.
+/// Sinus for an angle (going 0..u32::MAX for 0..360deg), where returned value is -32768 to 32767.
 pub fn sin(angle: u32) -> i16 {
     // The lookup table goes from 0..90.
     let t = if (angle & 0x4000_0000) > 0 {
@@ -56,21 +56,19 @@ const SIN_TABLE: &[u16] = &[
 ];
 
 pub fn tri(offset: u32) -> i16 {
-    //
     // /\
     //   \/
-    //
-    // at 0              2048
-    // at 1/4 * u32::MAX 4096
-    // at 2/4 * u32::MAX 2048
-    // at 3/4 * u32::MAX 0
     const DELTA: u32 = 1 << 15;
 
-    let n = match offset {
+    let mut n = match offset {
         0..=1_073_741_823 => (offset / DELTA) as i32,
         1_073_741_824..=3_221_225_471 => ((3_221_225_472 - offset) / DELTA) as i32 - 32_768,
         _ => ((offset - 3_221_225_472) / DELTA) as i32 - 32_768,
     };
+
+    if n == 32768 {
+        n = 32767;
+    }
 
     n as i16
 }
