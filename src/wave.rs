@@ -158,8 +158,8 @@ impl<const LEN: usize> ArrayWaveTable<LEN> {
 }
 
 impl<const LEN: usize> WaveTable for ArrayWaveTable<LEN> {
-    fn value_at<const FQ: u32>(&self, time: Time<FQ>, freq: f32) -> f32 {
-        let periods_fract = (time.count as f64 * freq as f64) / FQ as f64;
+    fn value_at<const FQ: u32>(&self, sample_time: Time<FQ>, freq: f32) -> f32 {
+        let periods_fract = (sample_time.count as f64 * freq as f64) / FQ as f64;
 
         // full periods done at time.count/FQ
         let periods_whole = periods_fract as usize as f64;
@@ -187,6 +187,68 @@ impl<const LEN: usize> WaveTable for ArrayWaveTable<LEN> {
     }
 }
 
+pub enum BasicWavetable {
+    Saw,
+    Square,
+    Sine,
+    Triangle,
+}
+
+impl WaveTable for BasicWavetable {
+    fn value_at<const FQ: u32>(&self, sample_time: Time<FQ>, freq: f32) -> f32 {
+        let periods_fract = (sample_time.count as f64 * freq as f64) / FQ as f64;
+
+        // full periods done at time.count/FQ
+        let periods_whole = periods_fract as usize as f64;
+
+        // fractional part of current period.
+        let fract = (periods_fract - periods_whole) as f32;
+
+        match self {
+            BasicWavetable::Saw => {
+                //   /|
+                //  / |
+                // -  |
+                //    | /
+                //    |/
+
+                let min_step = 1.0 / FQ as f32;
+
+                // start at 0.0
+                if fract < min_step {
+                    return 0.0;
+                }
+
+                if fract <= 0.5 {
+                    fract * 2.0
+                } else {
+                    -1.0 + (fract - 0.5) * 2.0
+                }
+            }
+            BasicWavetable::Square => {
+                // ---|
+                //    |
+                //    |
+                //    |
+                //    |---
+                if fract <= 0.5 {
+                    1.0
+                } else {
+                    -1.0
+                }
+            }
+            BasicWavetable::Sine => {
+                let deg = fract * u32::MAX as f32;
+                crate::geom::sin(deg as u32) as f32 / 32768.0
+            }
+            BasicWavetable::Triangle => {
+                let deg = fract * u32::MAX as f32;
+                crate::geom::tri(deg as u32) as f32 / 32768.0
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -202,12 +264,123 @@ mod test {
         // weighted value:
         // 0.0 + 1/44_000 * 440 * (1.0 - 0.0)
 
-        assert_eq!(wt.value_at::<44_000>(Time::new(0), 440.0), 0.0);
-        assert_eq!(wt.value_at::<44_000>(Time::new(1), 440.0), 0.01);
-        assert_eq!(wt.value_at::<44_000>(Time::new(2), 440.0), 0.02);
-        assert_eq!(wt.value_at::<44_000>(Time::new(100), 440.0), 0.0);
-        assert_eq!(wt.value_at::<44_000>(Time::new(101), 440.0), 0.01);
-        assert_eq!(wt.value_at::<44_000>(Time::new(43_999), 440.0), 0.99);
-        assert_eq!(wt.value_at::<44_000>(Time::new(44_000), 440.0), 0.0);
+        let todo = &[
+            (0, 0.0),
+            (1, 0.01),
+            (2, 0.02),
+            (101, 0.01),
+            (43_999, 0.99),
+            (44_000, 0.0),
+        ];
+
+        for (t, c) in todo {
+            assert!(
+                dbg!(wt.value_at::<44_000>(Time::new(*t), 440.0) - *c).abs() < 0.0001,
+                "{} => {:.2}",
+                t,
+                c
+            );
+        }
+    }
+
+    #[test]
+    fn test_wt_saw() {
+        let todo = &[
+            (0, 0.0),
+            (1, 0.02),
+            (2, 0.04),
+            (49, 0.98),
+            (50, 1.0),
+            (51, -0.98),
+            (99, -0.02),
+            (100, 0.0),
+            (101, 0.02),
+        ];
+
+        for (t, c) in todo {
+            assert!(
+                (dbg!(BasicWavetable::Saw.value_at::<44_000>(Time::new(*t), 440.0)) - *c).abs()
+                    < 0.0001,
+                "{} => {:.2}",
+                *t,
+                *c
+            )
+        }
+    }
+
+    #[test]
+    fn test_wt_square() {
+        let todo = &[
+            (0, 1.0),
+            (1, 1.0),
+            (49, 1.0),
+            (50, 1.0),
+            (51, -1.0),
+            (99, -1.0),
+            (100, 1.0),
+            (101, 1.0),
+        ];
+
+        for (t, c) in todo {
+            assert!(
+                (dbg!(BasicWavetable::Square.value_at::<44_000>(Time::new(*t), 440.0)) - *c).abs()
+                    < 0.0001,
+                "{} => {:.2}",
+                *t,
+                *c
+            )
+        }
+    }
+
+    #[test]
+    fn test_wt_sine() {
+        let todo = &[
+            (0, 0.0),
+            (1, 0.06277466),
+            (25, 1.0),
+            (49, 0.06277466),
+            (50, 0.0),
+            (51, -0.06277466),
+            (99, -0.06277466),
+            (100, 0.0),
+            (101, 0.06277466),
+        ];
+
+        for (t, c) in todo {
+            assert!(
+                (dbg!(BasicWavetable::Sine.value_at::<44_000>(Time::new(*t), 440.0)) - *c).abs()
+                    < 0.0001,
+                "{} => {:.2}",
+                *t,
+                *c
+            )
+        }
+    }
+
+    #[test]
+    fn test_wt_tri() {
+        let todo = &[
+            (0, 0.0),
+            (1, 0.04),
+            (25, 1.0),
+            (49, 0.04),
+            (50, 0.0),
+            (51, -0.04),
+            (75, -1.0),
+            (99, -0.04),
+            (100, 0.0),
+            (101, 0.04),
+        ];
+
+        for (t, c) in todo {
+            assert!(
+                (dbg!(BasicWavetable::Triangle.value_at::<44_000>(Time::new(*t), 440.0)) - *c)
+                    .abs()
+                    < 0.0001,
+                "{} => {:.2}",
+                *t,
+                *c
+            )
+        }
     }
 }
