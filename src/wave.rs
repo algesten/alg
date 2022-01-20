@@ -167,8 +167,11 @@ impl<const LEN: usize> WaveTable for ArrayWaveTable<LEN> {
         // fractional part of current period.
         let fract = (periods_fract - periods_whole) as f32;
 
-        // fractional offset into the array
-        let offset_el = fract * LEN as f32;
+        // fractional offset into the array.
+        // we want the array period to be back-to-back and not interpolate
+        // between the last element of the array and the first. hence
+        // we subtract 1 from the len here.
+        let offset_el = fract * (LEN - 1) as f32;
 
         // index into the array
         let n = offset_el as usize;
@@ -176,11 +179,8 @@ impl<const LEN: usize> WaveTable for ArrayWaveTable<LEN> {
         // weight between two adjacent elements in the array.
         let w = offset_el - (n as f32);
 
-        let (el1, el2) = if n == LEN - 1 {
-            (self.elements[LEN - 1], self.elements[0])
-        } else {
-            (self.elements[n], self.elements[n + 1])
-        };
+        // n+1 is always ok, since offset_el is always (LEN - 1).
+        let (el1, el2) = (self.elements[n], self.elements[n + 1]);
 
         // weighted value between elements
         el1 + (el2 - el1) * w
@@ -203,33 +203,11 @@ mod test {
         // 0.0 + 1/44_000 * 440 * (1.0 - 0.0)
 
         assert_eq!(wt.value_at::<44_000>(Time::new(0), 440.0), 0.0);
-        assert_eq!(wt.value_at::<44_000>(Time::new(1), 440.0), 0.02);
-        assert_eq!(wt.value_at::<44_000>(Time::new(2), 440.0), 0.04);
+        assert_eq!(wt.value_at::<44_000>(Time::new(1), 440.0), 0.01);
+        assert_eq!(wt.value_at::<44_000>(Time::new(2), 440.0), 0.02);
         assert_eq!(wt.value_at::<44_000>(Time::new(100), 440.0), 0.0);
-        assert_eq!(wt.value_at::<44_000>(Time::new(101), 440.0), 0.02);
-        assert_eq!(wt.value_at::<44_000>(Time::new(44_000), 440.0), 0.0);
-    }
-
-    #[test]
-    fn array_value_at_table1() {
-        let wt = ArrayWaveTable::new([0.0]);
-
-        assert_eq!(wt.value_at::<44_000>(Time::new(0), 440.0), 0.0);
-        assert_eq!(wt.value_at::<44_000>(Time::new(1), 440.0), 0.0);
-        assert_eq!(wt.value_at::<44_000>(Time::new(2), 440.0), 0.0);
-        assert_eq!(wt.value_at::<44_000>(Time::new(100), 440.0), 0.0);
-        assert_eq!(wt.value_at::<44_000>(Time::new(101), 440.0), 0.0);
-        assert_eq!(wt.value_at::<44_000>(Time::new(44_000), 440.0), 0.0);
-    }
-
-    #[test]
-    fn array_value_at_triangle() {
-        let wt = ArrayWaveTable::new([0.0, 1.0, 0.0, -1.0]);
-
-        assert_eq!(wt.value_at::<44_000>(Time::new(0), 440.0), 0.0);
-        assert_eq!(wt.value_at::<44_000>(Time::new(25), 440.0), 1.0);
-        assert_eq!(wt.value_at::<44_000>(Time::new(50), 440.0), 0.0);
-        assert_eq!(wt.value_at::<44_000>(Time::new(75), 440.0), -1.0);
+        assert_eq!(wt.value_at::<44_000>(Time::new(101), 440.0), 0.01);
+        assert_eq!(wt.value_at::<44_000>(Time::new(43_999), 440.0), 0.99);
         assert_eq!(wt.value_at::<44_000>(Time::new(44_000), 440.0), 0.0);
     }
 }
