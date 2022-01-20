@@ -1,17 +1,141 @@
 use crate::clock::Time;
 
-/// Morph between two wavetables.
-pub fn wavetable_morph<W1: WaveTable, W2: WaveTable, const FQ: u32>(
+pub struct WaveTableBuffer<W1: WaveTable, W2: WaveTable, const LEN: usize, const FQ: u32> {
+    /// One wavetable.
     wt1: W1,
-    wt2: W2,
-    sample_time: Time<FQ>,
-    freq: f32,
-    weight: f32,
-) -> f32 {
-    let v1 = wt1.value_at(sample_time, freq);
-    let v2 = wt2.value_at(sample_time, freq);
 
-    v1 + (v2 - v1) * weight
+    /// The other wavetable.
+    wt2: W2,
+
+    /// Buffered output starting at `time`.
+    buffer: [f32; LEN],
+
+    /// Used when morphing between two sets of parameters.
+    buffer_morph: [f32; LEN],
+
+    /// Time at buffer[0], in sample rate denomination.
+    time: Time<FQ>,
+
+    /// Previous set of parameters used to create current buffer.
+    params: WaveTableParams,
+
+    /// Next set of parameters when doing advance_buffer().
+    params_next: Option<WaveTableParams>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WaveTableParams {
+    /// Offset between two wavetables.
+    offset: f32,
+
+    /// Frequency to play in Hz.
+    freq: f32,
+}
+
+impl<W1: WaveTable, W2: WaveTable, const LEN: usize, const FQ: u32>
+    WaveTableBuffer<W1, W2, LEN, FQ>
+{
+    pub fn new(wt1: W1, wt2: W2) -> Self {
+        let buffer = [0_f32; LEN];
+        let buffer_morph = [0_f32; LEN];
+
+        // first call to advance_time below will move to 0.
+        let time = Time::new(-1 * LEN as i64);
+
+        let params = WaveTableParams {
+            offset: 1.0,
+            freq: 440.0,
+        };
+
+        let mut m = WaveTableBuffer {
+            wt1,
+            wt2,
+            buffer,
+            buffer_morph,
+            time,
+            params: params,
+            params_next: None,
+        };
+
+        // fill first buffer (and move time to 0)
+        m.advance_time();
+
+        m
+    }
+
+    pub fn time(&self) -> &Time<FQ> {
+        &self.time
+    }
+
+    pub fn buffer(&self) -> &[f32] {
+        &self.buffer
+    }
+
+    pub fn set_params(&mut self, params: WaveTableParams) {
+        self.params_next = Some(params);
+    }
+
+    pub fn advance_time(&mut self) {
+        // Move time forwards.
+        self.time.count += self.buffer.len() as i64;
+
+        // Update current buffer with current parameters.
+        fill_buf(
+            &mut self.buffer,
+            &self.wt1,
+            &self.wt2,
+            self.time,
+            self.params,
+        );
+
+        if let Some(params_next) = self.params_next.take() {
+            // Make morph buffer and update current towards it.
+            fill_buf(
+                &mut self.buffer_morph,
+                &self.wt1,
+                &self.wt2,
+                self.time,
+                params_next,
+            );
+
+            // weight between buffers moving from 0.0..1.0 over LEN
+            let mut w = 0.0;
+
+            // delta to move for each step.
+            let dw = 1.0 / LEN as f32;
+
+            for (b1, b2) in self.buffer.iter_mut().zip(self.buffer_morph.iter()) {
+                *b1 = *b1 + (*b1 - *b2) * w;
+                w += dw;
+            }
+
+            // update current set of parameters.
+            self.params = params_next;
+        }
+    }
+}
+
+/// Fill buffer from set of parameters.
+fn fill_buf<W1: WaveTable, W2: WaveTable, const FQ: u32>(
+    buf: &mut [f32],
+    wt1: &W1,
+    wt2: &W2,
+    mut sample_time: Time<FQ>,
+    params: WaveTableParams,
+) {
+    for b in buf {
+        let v1 = wt1.value_at(sample_time, params.freq);
+        let v2 = wt2.value_at(sample_time, params.freq);
+
+        // The weighted offset between the two tables.
+        let n = v1 + (v2 - v1) * params.offset;
+
+        // Set this in buffer.
+        *b = n;
+
+        // Move time
+        sample_time.count += 1;
+    }
 }
 
 /// Abstraction over a wavetable.
