@@ -9,7 +9,7 @@ use gcd::Gcd;
 ///
 /// Example: If the CPU speed is 600Mhz, we get a 32-bit cycle of 2.pow(32) / 600E6 ≈ 7.16 seconds.
 /// That means we must call `tick` more often than every 7.16 seconds.
-#[derive(Debug)]
+#[derive(Debug, defmt::Format)]
 pub struct Clock<S, const FQ: u32> {
     sample_fn: S,
     upper: u32,
@@ -86,7 +86,7 @@ where
 }
 
 /// A time representation as produced by `Clock::now()`.
-#[derive(Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, Default, defmt::Format)]
 pub struct Time<const FQ: u32> {
     pub count: i64,
 }
