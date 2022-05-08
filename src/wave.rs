@@ -109,7 +109,7 @@ impl<W1: WaveTable, W2: WaveTable, const LEN: usize, const FQ: u32>
             let dw = 1.0 / LEN as f32;
 
             for (b1, b2) in self.buffer.iter_mut().zip(self.buffer_morph.iter()) {
-                *b1 = *b1 + (*b1 - *b2) * w;
+                *b1 = *b1 + (*b2 - *b1) * w;
                 w += dw;
             }
 
