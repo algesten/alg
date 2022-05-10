@@ -62,7 +62,7 @@ pub fn tri(offset: u32) -> i16 {
 
     let mut n = match offset {
         0..=1_073_741_823 => (offset / DELTA) as i32,
-        1_073_741_824..=3_221_225_471 => ((3_221_225_472 - offset) / DELTA) as i32 - 32_768,
+        1_073_741_824..=3_221_225_472 => ((3_221_225_472 - offset) / DELTA) as i32 - 32_768,
         _ => ((offset - 3_221_225_472) / DELTA) as i32 - 32_768,
     };
 
@@ -98,5 +98,6 @@ mod test {
         assert_eq!(tri(u32::MAX / 2), 0);
         assert_eq!(tri((u32::MAX / 4) * 3), -32768);
         assert_eq!(tri(u32::MAX), -1);
+        assert_eq!(tri(3221225472), -32768);
     }
 }
