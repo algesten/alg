@@ -8,10 +8,10 @@ pub struct WaveTableBuffer<W1: WaveTable, W2: WaveTable, const LEN: usize, const
     wt2: W2,
 
     /// Current offset in wt1,
-    offset_wt1: Accumulator,
+    acc1: Accumulator,
 
     /// Current offset in wt2,
-    offset_wt2: Accumulator,
+    acc2: Accumulator,
 
     /// Buffered output starting at `time`.
     buffer: [f32; LEN],
@@ -50,8 +50,8 @@ impl<W1: WaveTable, W2: WaveTable, const LEN: usize, const FQ: u32>
         WaveTableBuffer {
             wt1,
             wt2,
-            offset_wt1: Accumulator(0.0),
-            offset_wt2: Accumulator(0.0),
+            acc1: Accumulator(0.0),
+            acc2: Accumulator(0.0),
             buffer,
             buffer_morph,
             params: params,
@@ -79,9 +79,9 @@ impl<W1: WaveTable, W2: WaveTable, const LEN: usize, const FQ: u32>
 
         let (acc1, acc2) = fill_buf(
             &self.wt1,
-            self.offset_wt1,
             &self.wt2,
-            self.offset_wt2,
+            self.acc1,
+            self.acc2,
             dt,
             freq,
             &mut self.buffer,
@@ -91,9 +91,9 @@ impl<W1: WaveTable, W2: WaveTable, const LEN: usize, const FQ: u32>
         if let Some(next) = self.params_next {
             let _ = fill_buf(
                 &self.wt1,
-                self.offset_wt1,
                 &self.wt2,
-                self.offset_wt2,
+                self.acc1,
+                self.acc2,
                 dt,
                 freq,
                 &mut self.buffer_morph,
@@ -116,16 +116,16 @@ impl<W1: WaveTable, W2: WaveTable, const LEN: usize, const FQ: u32>
         }
 
         // remember accumulator for next advance_time() call
-        self.offset_wt1 = acc1;
-        self.offset_wt2 = acc2;
+        self.acc1 = acc1;
+        self.acc2 = acc2;
     }
 }
 
 #[inline(always)]
 fn fill_buf<W1: WaveTable, W2: WaveTable, const FQ: u32>(
     wt1: &W1,
-    acc1: Accumulator,
     wt2: &W2,
+    acc1: Accumulator,
     acc2: Accumulator,
     dt: Time<FQ>,
     freq: f32,
@@ -210,7 +210,7 @@ impl<const LEN: usize> WaveTable for ArrayWaveTable<LEN> {
                 *b = value;
             } else {
                 // weight between existing and incoming value.
-                *b = value + (*b - value) * offset;
+                *b = *b + (value - *b) * offset;
             }
         }
 
@@ -293,7 +293,7 @@ impl WaveTable for BasicWavetable {
                 *b = value;
             } else {
                 // weight between existing and incoming value.
-                *b = value + (*b - value) * offset;
+                *b = *b + (value - *b) * offset;
             }
         }
 
