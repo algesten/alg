@@ -7,14 +7,17 @@ pub struct WaveTableBuffer<W1: WaveTable, W2: WaveTable, const LEN: usize, const
     /// The other wavetable.
     wt2: W2,
 
+    /// Current offset in wt1,
+    offset_wt1: Accumulator,
+
+    /// Current offset in wt2,
+    offset_wt2: Accumulator,
+
     /// Buffered output starting at `time`.
     buffer: [f32; LEN],
 
     /// Used when morphing between two sets of parameters.
     buffer_morph: [f32; LEN],
-
-    /// Time at buffer[0], in sample rate denomination.
-    time: Time<FQ>,
 
     /// Previous set of parameters used to create current buffer.
     params: WaveTableParams,
@@ -39,32 +42,21 @@ impl<W1: WaveTable, W2: WaveTable, const LEN: usize, const FQ: u32>
         let buffer = [0_f32; LEN];
         let buffer_morph = [0_f32; LEN];
 
-        // first call to advance_time below will move to 0.
-        let time = Time::new(-1 * LEN as i64);
-
         let params = WaveTableParams {
             offset: 0.0,
             freq: 440.0,
         };
 
-        let mut m = WaveTableBuffer {
+        WaveTableBuffer {
             wt1,
             wt2,
+            offset_wt1: Accumulator(0.0),
+            offset_wt2: Accumulator(0.0),
             buffer,
             buffer_morph,
-            time,
             params: params,
             params_next: None,
-        };
-
-        // fill first buffer (and move time to 0)
-        m.advance_time();
-
-        m
-    }
-
-    pub fn time(&self) -> &Time<FQ> {
-        &self.time
+        }
     }
 
     pub fn buffer(&self) -> &[f32] {
@@ -80,26 +72,32 @@ impl<W1: WaveTable, W2: WaveTable, const LEN: usize, const FQ: u32>
     }
 
     pub fn advance_time(&mut self) {
-        // Move time forwards.
-        self.time.count += self.buffer.len() as i64;
+        let dt: Time<FQ> = Time::new(1);
 
-        // Update current buffer with current parameters.
-        fill_buf(
-            &mut self.buffer,
+        // Prefer next parameter frequency
+        let freq = self.params_next.unwrap_or(self.params).freq;
+
+        let (acc1, acc2) = fill_buf(
             &self.wt1,
+            self.offset_wt1,
             &self.wt2,
-            self.time,
-            self.params,
+            self.offset_wt2,
+            dt,
+            freq,
+            &mut self.buffer,
+            self.params.offset,
         );
 
-        if let Some(params_next) = self.params_next.take() {
-            // Make morph buffer and update current towards it.
-            fill_buf(
-                &mut self.buffer_morph,
+        if let Some(next) = self.params_next {
+            let _ = fill_buf(
                 &self.wt1,
+                self.offset_wt1,
                 &self.wt2,
-                self.time,
-                params_next,
+                self.offset_wt2,
+                dt,
+                freq,
+                &mut self.buffer_morph,
+                next.offset,
             );
 
             // weight between buffers moving from 0.0..1.0 over LEN
@@ -114,42 +112,49 @@ impl<W1: WaveTable, W2: WaveTable, const LEN: usize, const FQ: u32>
             }
 
             // update current set of parameters.
-            self.params = params_next;
+            self.params = next;
         }
+
+        // remember accumulator for next advance_time() call
+        self.offset_wt1 = acc1;
+        self.offset_wt2 = acc2;
     }
 }
 
-/// Fill buffer from set of parameters.
+#[inline(always)]
 fn fill_buf<W1: WaveTable, W2: WaveTable, const FQ: u32>(
-    buf: &mut [f32],
     wt1: &W1,
+    acc1: Accumulator,
     wt2: &W2,
-    mut sample_time: Time<FQ>,
-    params: WaveTableParams,
-) {
-    for b in buf {
-        let v1 = wt1.value_at(sample_time, params.freq);
-        let v2 = wt2.value_at(sample_time, params.freq);
+    acc2: Accumulator,
+    dt: Time<FQ>,
+    freq: f32,
+    buf: &mut [f32],
+    offset: f32,
+) -> (Accumulator, Accumulator) {
+    // First fill buffer with value of wt1, offset 0.0
+    let acc1 = wt1.fill_buf(acc1, dt, freq, buf, 0.0);
 
-        // The weighted offset between the two tables.
-        let n = v1 + (v2 - v1) * params.offset;
+    // Second add to buffer the offset from wt2
+    let acc2 = wt2.fill_buf(acc2, dt, freq, buf, offset);
 
-        // Set this in buffer.
-        *b = n;
-
-        // Move time
-        sample_time.count += 1;
-    }
+    (acc1, acc2)
 }
 
 /// Abstraction over a wavetable.
 pub trait WaveTable {
-    /// Sample time is the current time in some sample rate. I.e. `Time<48_000>`
-    /// or `Time<96_000>`. The wave table is considered one entire period,
-    /// so a frequency of `440.0` means we should repeat the wave table 440
-    /// times during one full sample time 0-FQ.
-    fn value_at<const FQ: u32>(&self, sample_time: Time<FQ>, freq: f32) -> f32;
+    fn fill_buf<const FQ: u32>(
+        &self,
+        acc: Accumulator,
+        dt: Time<FQ>,
+        freq: f32,
+        buf: &mut [f32],
+        offset: f32,
+    ) -> Accumulator;
 }
+
+#[derive(Debug, Clone, Copy)]
+pub struct Accumulator(pub f32);
 
 pub struct ArrayWaveTable<const LEN: usize> {
     elements: [f32; LEN],
@@ -162,32 +167,54 @@ impl<const LEN: usize> ArrayWaveTable<LEN> {
 }
 
 impl<const LEN: usize> WaveTable for ArrayWaveTable<LEN> {
-    fn value_at<const FQ: u32>(&self, sample_time: Time<FQ>, freq: f32) -> f32 {
-        let periods_fract = (sample_time.count as f64 * freq as f64) / FQ as f64;
+    #[inline(always)]
+    fn fill_buf<const FQ: u32>(
+        &self,
+        acc: Accumulator,
+        dt: Time<FQ>,
+        freq: f32,
+        buf: &mut [f32],
+        offset: f32,
+    ) -> Accumulator {
+        // LEN - 1, because we don't want to "overshoot" the last element.
+        let len = (LEN - 1) as f32;
 
-        // full periods done at time.count/FQ
-        let periods_whole = periods_fract as usize as f64;
+        // "distance" in fractional index that dt represents.
+        // NB. dt.count is typically 1, so "as f32" is fine despite it being an i64
+        let dp = (dt.count as f32 * freq * len) / FQ as f32;
 
-        // fractional part of current period.
-        let fract = (periods_fract - periods_whole) as f32;
+        // Value we want at dt "distance" from start.
+        let mut offset_el = acc.0;
 
-        // fractional offset into the array.
-        // we want the array period to be back-to-back and not interpolate
-        // between the last element of the array and the first. hence
-        // we subtract 1 from the len here.
-        let offset_el = fract * (LEN - 1) as f32;
+        for b in buf {
+            offset_el += dp;
 
-        // index into the array
-        let n = offset_el as usize;
+            // Wrap around the end
+            while offset_el > len {
+                offset_el -= len;
+            }
 
-        // weight between two adjacent elements in the array.
-        let w = offset_el - (n as f32);
+            // Index into array
+            let n = offset_el as usize;
 
-        // n+1 is always ok, since offset_el is always (LEN - 1).
-        let (el1, el2) = (self.elements[n], self.elements[n + 1]);
+            // weight between two adjacent elements in the array.
+            let w = offset_el - (n as f32);
 
-        // weighted value between elements
-        el1 + (el2 - el1) * w
+            // n+1 is always ok, since offset_el is always (LEN - 1).
+            let (el1, el2) = (self.elements[n], self.elements[n + 1]);
+
+            // weighted value between elements
+            let value = el1 + (el2 - el1) * w;
+
+            if offset == 0.0 {
+                *b = value;
+            } else {
+                // weight between existing and incoming value.
+                *b = value + (*b - value) * offset;
+            }
+        }
+
+        Accumulator(offset_el)
     }
 }
 
@@ -199,57 +226,78 @@ pub enum BasicWavetable {
 }
 
 impl WaveTable for BasicWavetable {
-    fn value_at<const FQ: u32>(&self, sample_time: Time<FQ>, freq: f32) -> f32 {
-        let periods_fract = (sample_time.count as f64 * freq as f64) / FQ as f64;
+    #[inline(always)]
+    fn fill_buf<const FQ: u32>(
+        &self,
+        acc: Accumulator,
+        dt: Time<FQ>,
+        freq: f32,
+        buf: &mut [f32],
+        offset: f32,
+    ) -> Accumulator {
+        // NB. dt.count is typically 1, so "as f32" is fine despite it being an i64
+        let dp = (dt.count as f32 * freq) / FQ as f32;
 
-        // full periods done at time.count/FQ
-        let periods_whole = periods_fract as usize as f64;
+        // Fractional offset for the value wanted
+        let mut fract = acc.0;
 
-        // fractional part of current period.
-        let fract = (periods_fract - periods_whole) as f32;
+        for b in buf {
+            fract += dp;
 
-        match self {
-            BasicWavetable::Saw => {
-                //   /|
-                //  / |
-                // -  |
-                //    | /
-                //    |/
-
-                let min_step = 1.0 / FQ as f32;
-
-                // start at 0.0
-                if fract < min_step {
-                    return 0.0;
-                }
-
-                if fract <= 0.5 {
-                    fract * 2.0
-                } else {
-                    -1.0 + (fract - 0.5) * 2.0
-                }
+            while fract > 1.0 {
+                fract -= 1.0;
             }
-            BasicWavetable::Square => {
-                // ---|
-                //    |
-                //    |
-                //    |
-                //    |---
-                if fract <= 0.5 {
-                    1.0
-                } else {
-                    -1.0
+
+            let value = match self {
+                BasicWavetable::Saw => {
+                    //   /|
+                    //  / |
+                    // -  |
+                    //    | /
+                    //    |/
+
+                    let min_step = 1.0 / FQ as f32;
+
+                    // start at 0.0
+                    if fract < min_step {
+                        0.0
+                    } else if fract <= 0.5 {
+                        fract * 2.0
+                    } else {
+                        -1.0 + (fract - 0.5) * 2.0
+                    }
                 }
-            }
-            BasicWavetable::Sine => {
-                let deg = fract * u32::MAX as f32;
-                crate::geom::sin(deg as u32) as f32 / 32768.0
-            }
-            BasicWavetable::Triangle => {
-                let deg = fract * u32::MAX as f32;
-                crate::geom::tri(deg as u32) as f32 / 32768.0
+                BasicWavetable::Square => {
+                    // ---|
+                    //    |
+                    //    |
+                    //    |
+                    //    |---
+                    if fract <= 0.5 {
+                        1.0
+                    } else {
+                        -1.0
+                    }
+                }
+                BasicWavetable::Sine => {
+                    let deg = fract * u32::MAX as f32;
+                    crate::geom::sin(deg as u32) as f32 / 32768.0
+                }
+                BasicWavetable::Triangle => {
+                    let deg = fract * u32::MAX as f32;
+                    crate::geom::tri(deg as u32) as f32 / 32768.0
+                }
+            };
+
+            if offset == 0.0 {
+                *b = value;
+            } else {
+                // weight between existing and incoming value.
+                *b = value + (*b - value) * offset;
             }
         }
+
+        Accumulator(fract)
     }
 }
 
@@ -258,134 +306,99 @@ mod test {
     use super::*;
 
     #[test]
-    fn array_value_at_table2() {
-        let wt = ArrayWaveTable::new([0.0, 1.0]);
-
-        // time = tn/td
-        // offset = (tn/td) * freq
-        // e.g 0.5Hz at step 1 in 44kHz is: 1/44_000 * 0.5
-
-        // weighted value:
-        // 0.0 + 1/44_000 * 440 * (1.0 - 0.0)
-
-        let todo = &[
-            (0, 0.0),
-            (1, 0.01),
-            (2, 0.02),
-            (101, 0.01),
-            (43_999, 0.99),
-            (44_000, 0.0),
-        ];
-
-        for (t, c) in todo {
-            assert!(
-                dbg!(wt.value_at::<44_000>(Time::new(*t), 440.0) - *c).abs() < 0.0001,
-                "{} => {:.2}",
-                t,
-                c
-            );
-        }
-    }
-
-    #[test]
     fn test_wt_saw() {
-        let todo = &[
-            (0, 0.0),
-            (1, 0.02),
-            (2, 0.04),
-            (49, 0.98),
-            (50, 1.0),
-            (51, -0.98),
-            (99, -0.02),
-            (100, 0.0),
-            (101, 0.02),
-        ];
+        let mut buf = [0.0; 16];
 
-        for (t, c) in todo {
-            assert!(
-                (dbg!(BasicWavetable::Saw.value_at::<44_000>(Time::new(*t), 440.0)) - *c).abs()
-                    < 0.0001,
-                "{} => {:.2}",
-                *t,
-                *c
-            )
-        }
+        let wt = BasicWavetable::Saw;
+
+        wt.fill_buf(Accumulator(0.0), Time::<64>::new(1), 440.0, &mut buf, 0.0);
+
+        assert_eq!(
+            buf,
+            [
+                -0.25, -0.5, -0.75, 1.0, 0.75, 0.5, 0.25, 0.0, -0.25, -0.5, -0.75, 1.0, 0.75, 0.5,
+                0.25, 0.0
+            ]
+        );
     }
 
     #[test]
     fn test_wt_square() {
-        let todo = &[
-            (0, 1.0),
-            (1, 1.0),
-            (49, 1.0),
-            (50, 1.0),
-            (51, -1.0),
-            (99, -1.0),
-            (100, 1.0),
-            (101, 1.0),
-        ];
+        let mut buf = [0.0; 16];
 
-        for (t, c) in todo {
-            assert!(
-                (dbg!(BasicWavetable::Square.value_at::<44_000>(Time::new(*t), 440.0)) - *c).abs()
-                    < 0.0001,
-                "{} => {:.2}",
-                *t,
-                *c
-            )
-        }
+        let wt = BasicWavetable::Square;
+
+        wt.fill_buf(Accumulator(0.0), Time::<64>::new(1), 440.0, &mut buf, 0.0);
+
+        assert_eq!(
+            buf,
+            [
+                -1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0, -1.0, -1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0,
+                -1.0
+            ]
+        );
     }
 
     #[test]
     fn test_wt_sine() {
-        let todo = &[
-            (0, 0.0),
-            (1, 0.06277466),
-            (25, 1.0),
-            (49, 0.06277466),
-            (50, 0.0),
-            (51, -0.06277466),
-            (99, -0.06277466),
-            (100, 0.0),
-            (101, 0.06277466),
-        ];
+        let mut buf = [0.0; 16];
 
-        for (t, c) in todo {
-            assert!(
-                (dbg!(BasicWavetable::Sine.value_at::<44_000>(Time::new(*t), 440.0)) - *c).abs()
-                    < 0.0001,
-                "{} => {:.2}",
-                *t,
-                *c
-            )
-        }
+        let wt = BasicWavetable::Sine;
+
+        wt.fill_buf(Accumulator(0.0), Time::<64>::new(1), 440.0, &mut buf, 0.0);
+
+        assert_eq!(
+            buf,
+            [
+                -0.70706177,
+                -0.9999695,
+                -0.7070923,
+                0.0,
+                0.70706177,
+                0.9999695,
+                0.7070923,
+                0.0,
+                -0.70706177,
+                -0.9999695,
+                -0.7070923,
+                0.0,
+                0.70706177,
+                0.9999695,
+                0.7070923,
+                0.0
+            ]
+        );
     }
 
     #[test]
     fn test_wt_tri() {
-        let todo = &[
-            (0, 0.0),
-            (1, 0.04),
-            (25, 1.0),
-            (49, 0.04),
-            (50, 0.0),
-            (51, -0.04),
-            (75, -1.0),
-            (99, -0.04),
-            (100, 0.0),
-            (101, 0.04),
-        ];
+        let mut buf = [0.0; 16];
 
-        for (t, c) in todo {
-            assert!(
-                (dbg!(BasicWavetable::Triangle.value_at::<44_000>(Time::new(*t), 440.0)) - *c)
-                    .abs()
-                    < 0.0001,
-                "{} => {:.2}",
-                *t,
-                *c
-            )
-        }
+        let wt = BasicWavetable::Triangle;
+
+        wt.fill_buf(Accumulator(0.0), Time::<64>::new(1), 440.0, &mut buf, 0.0);
+
+        assert_eq!(
+            buf,
+            [
+                -0.5,
+                -1.0,
+                -0.5,
+                0.0,
+                0.5,
+                0.9999695,
+                0.5,
+                -3.0517578e-5,
+                -0.5,
+                -1.0,
+                -0.5,
+                0.0,
+                0.5,
+                0.9999695,
+                0.5,
+                -3.0517578e-5
+            ]
+        );
     }
 
     // #[test]
