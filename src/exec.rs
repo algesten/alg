@@ -4,7 +4,6 @@ use core::task::Poll;
 use core::task::{Context, Waker};
 use core::{future::Future, task::RawWaker};
 use core::{pin::Pin, task::RawWakerVTable};
-use slab::Slab;
 
 /// Run an executor over the "root future" given. Any additional
 /// futures must be added as children using [`zip`] etc.
@@ -32,34 +31,37 @@ pub fn executor<F: Future>(mut future: F) -> F::Output {
 struct Tasks {
     /// Waker instances at fixed places in memory. The whole Tasks instance
     /// must be fixed in place to keep the validity of the wakers issued.
-    wakers: Slab<Wok>,
+    wakers: [Option<Wok>; 1],
 }
 
 impl Tasks {
-    fn new(size: usize) -> Self {
-        Tasks {
-            wakers: Slab::with_capacity(size),
-        }
+    fn new(_size: usize) -> Self {
+        Tasks { wakers: [None] }
     }
 
     /// Issue a new waker. Panics if we have run out.
     fn next_raw_waker(&mut self) -> RawWaker {
-        if self.wakers.len() == self.wakers.capacity() - 1 {
-            panic!("Too many wakers");
-        }
+        // if self.wakers.len() == self.wakers.capacity() - 1 {
+        //     panic!("Too many wakers");
+        // }
 
         let ptr = self as *mut Tasks;
 
-        let entry = self.wakers.vacant_entry();
-        let key = entry.key();
-        let w = Wok { ptr, key, count: 1 };
-        entry.insert(w);
+        // let entry = self.wakers.vacant_entry();
+        // let key = entry.key();
+        let w = Wok {
+            ptr,
+            key: 0,
+            count: 1,
+        };
+        self.wakers[0] = Some(w);
+        // entry.insert(w);
 
-        self.wakers.get(key).unwrap().as_raw_waker()
+        self.wakers[0].as_ref().unwrap().as_raw_waker()
     }
 
     fn remove_waker(&mut self, key: usize) {
-        self.wakers.remove(key);
+        self.wakers[key] = None;
     }
 }
 
