@@ -125,6 +125,12 @@ pub enum Edge<const CLK: u32> {
     Falling(Time<CLK>),
 }
 
+impl<const CLK: u32> Edge<CLK> {
+    pub fn is_rising(&self) -> bool {
+        matches!(self, Edge::Rising(_))
+    }
+}
+
 /// A deduping over DigitalInput that gives an indication of when something changes.
 pub struct DigitalEdgeInput<I, const CLK: u32> {
     input: I,
