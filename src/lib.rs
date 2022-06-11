@@ -7,6 +7,7 @@ extern crate log;
 pub mod clock;
 pub mod encoder;
 pub mod euclid;
+pub mod exec;
 pub mod gen;
 pub mod geom;
 pub mod input;
