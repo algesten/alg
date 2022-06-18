@@ -132,8 +132,8 @@ fn fill_buf<W1: WaveTable, W2: WaveTable, const FQ: u32>(
     buf: &mut [f32],
     offset: f32,
 ) -> (Accumulator, Accumulator) {
-    // First fill buffer with value of wt1, offset 0.0
-    let acc1 = wt1.fill_buf(acc1, dt, freq, buf, 0.0);
+    // First fill buffer with value of wt1, offset 1.0 to definitely get this wave
+    let acc1 = wt1.fill_buf(acc1, dt, freq, buf, 1.0);
 
     // Second add to buffer the offset from wt2
     let acc2 = wt2.fill_buf(acc2, dt, freq, buf, offset);
@@ -207,6 +207,8 @@ impl<const LEN: usize> WaveTable for ArrayWaveTable<LEN> {
             let value = el1 + (el2 - el1) * w;
 
             if offset == 0.0 {
+                // keep b.
+            } else if offset == 1.0 {
                 *b = value;
             } else {
                 // weight between existing and incoming value.
@@ -290,6 +292,8 @@ impl WaveTable for BasicWavetable {
             };
 
             if offset == 0.0 {
+                // keep b.
+            } else if offset == 1.0 {
                 *b = value;
             } else {
                 // weight between existing and incoming value.
