@@ -145,11 +145,16 @@ fn fill_buf<W1: WaveTable, W2: WaveTable, const FQ: u32>(
 pub trait WaveTable {
     fn fill_buf<const FQ: u32>(
         &self,
+        // Accumulator returned from previous call to `fill_buf`.
         acc: Accumulator,
+        // Time delta for each "step" of the buffer.
         dt: Time<FQ>,
+        // Frequency of wave we want to get. Typically one wavetable is one oscillation.
         freq: f32,
+        // Buffer to write into.
         buf: &mut [f32],
-        offset: f32,
+        // How much to "replace" the current in the buffer. 0.0 means retain buffer as is. 1.0 fully replace.
+        replace: f32,
     ) -> Accumulator;
 }
 
@@ -174,7 +179,7 @@ impl<const LEN: usize> WaveTable for ArrayWaveTable<LEN> {
         dt: Time<FQ>,
         freq: f32,
         buf: &mut [f32],
-        offset: f32,
+        replace: f32,
     ) -> Accumulator {
         // LEN - 1, because we don't want to "overshoot" the last element.
         let len = (LEN - 1) as f32;
@@ -206,13 +211,13 @@ impl<const LEN: usize> WaveTable for ArrayWaveTable<LEN> {
             // weighted value between elements
             let value = el1 + (el2 - el1) * w;
 
-            if offset == 0.0 {
+            if replace == 0.0 {
                 // keep b.
-            } else if offset == 1.0 {
+            } else if replace == 1.0 {
                 *b = value;
             } else {
                 // weight between existing and incoming value.
-                *b = *b + (value - *b) * offset;
+                *b = *b + (value - *b) * replace;
             }
         }
 
@@ -235,7 +240,7 @@ impl WaveTable for BasicWavetable {
         dt: Time<FQ>,
         freq: f32,
         buf: &mut [f32],
-        offset: f32,
+        replace: f32,
     ) -> Accumulator {
         // NB. dt.count is typically 1, so "as f32" is fine despite it being an i64
         let dp = (dt.count as f32 * freq) / FQ as f32;
@@ -291,13 +296,13 @@ impl WaveTable for BasicWavetable {
                 }
             };
 
-            if offset == 0.0 {
+            if replace == 0.0 {
                 // keep b.
-            } else if offset == 1.0 {
+            } else if replace == 1.0 {
                 *b = value;
             } else {
                 // weight between existing and incoming value.
-                *b = *b + (value - *b) * offset;
+                *b = *b + (value - *b) * replace;
             }
         }
 
