@@ -4,13 +4,10 @@ pub struct RingBuf<T, const X: usize> {
     remove: usize,
 }
 
-impl<T, const X: usize> RingBuf<T, X> {
+impl<T: Copy, const X: usize> RingBuf<T, X> {
     pub fn new() -> Self {
-        assert!(X > 0);
-        let data = unsafe { core::mem::MaybeUninit::<[Option<T>; X]>::zeroed().assume_init() };
-
         RingBuf {
-            data,
+            data: [None; X],
             insert: 0,
             remove: 0,
         }
