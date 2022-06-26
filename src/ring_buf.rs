@@ -27,7 +27,7 @@ impl<T, const X: usize> RingBuf<T, X> {
 
     pub fn push(&mut self, el: T) {
         if self.len() == X - 1 {
-            panic!("CircleBuf push overflow");
+            panic!("RingBuf push overflow");
         }
         self.data[self.insert] = Some(el);
         self.insert += 1;
