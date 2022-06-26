@@ -12,6 +12,7 @@ pub mod gen;
 pub mod geom;
 pub mod input;
 pub mod pat;
+pub mod ring_buf;
 pub mod rnd;
 pub mod tempo;
 
