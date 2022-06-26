@@ -9,11 +9,25 @@ use gcd::Gcd;
 ///
 /// Example: If the CPU speed is 600Mhz, we get a 32-bit cycle of 2.pow(32) / 600E6 ≈ 7.16 seconds.
 /// That means we must call `tick` more often than every 7.16 seconds.
-#[derive(Debug, defmt::Format)]
+#[derive(Debug)]
 pub struct Clock<S, const FQ: u32> {
     sample_fn: S,
+    bits: u32,
+    half_way: u32,
     upper: u32,
     lower: u32,
+}
+
+impl<S, const FQ: u32> defmt::Format for Clock<S, FQ> {
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(
+            fmt,
+            "Clock {{ bits: {}, upper: {}, lower: {} }}",
+            self.bits,
+            self.upper,
+            self.lower
+        )
+    }
 }
 
 impl<S, const FQ: u32> Clock<S, FQ>
@@ -21,12 +35,19 @@ where
     S: Fn() -> u32,
 {
     /// Creates a new clock instance providing the sample function needed to read the current
-    /// cpu clock cycle and the frequency of the CPU.
+    /// cpu clock cycle and the frequency of the CPU. Assumes full 32 bits out of sample_fn.
     pub fn new(sample_fn: S) -> Self {
+        Self::new_with_bits(32, sample_fn)
+    }
+
+    /// Creates a new clock instance by setting number of expected bits for the sample_fn.
+    pub fn new_with_bits(bits: u32, sample_fn: S) -> Self {
         let start = sample_fn();
 
         Clock {
             sample_fn,
+            bits,
+            half_way: 2_u32.pow(bits - 1),
             upper: 0,
             lower: start,
         }
@@ -35,11 +56,9 @@ where
     /// Sample the current CPU clock and update the internal clock state. This must be done often
     /// enough that `sample_fn` doesn't risk looping twice.
     pub fn tick(&mut self) {
-        const HALF: u32 = 2_u32.pow(31);
-
         let cur = (self.sample_fn)();
 
-        if cur < HALF && self.lower > HALF {
+        if cur < self.half_way && self.lower > self.half_way {
             // we have looped around.
             self.upper += 1;
         }
@@ -47,28 +66,10 @@ where
         self.lower = cur;
     }
 
-    /// Given a u32 cycle count, get Time using the "knowledge" of where the
-    /// time is in this clock. I.e. if the time wraps around,
-    /// we get a correct time for that.
-    pub fn time_relative(&self, cycle_count: u32) -> Time<FQ> {
-        const HALF: u32 = 2_u32.pow(31);
-
-        let upper = if cycle_count < HALF && self.lower > HALF {
-            // looped around.
-            self.upper + 1
-        } else {
-            self.upper
-        };
-
-        Time {
-            count: ((upper as i64) << 32) | (cycle_count as i64),
-        }
-    }
-
     /// Get the current time. This is reasonably called _after_ `tick()`.
     pub fn now(&self) -> Time<FQ> {
         Time {
-            count: ((self.upper as i64) << 32) | (self.lower as i64),
+            count: ((self.upper as i64) << self.bits) | (self.lower as i64),
         }
     }
 
