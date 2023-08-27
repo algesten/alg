@@ -12,6 +12,7 @@ float = []
 gcd = "2"
 log = "0.4"
 defmt = "0.3"
+heapless = { version = "0.7.16", features = ["defmt"] }
 
 [dev-dependencies]
-rodio = {version = "0.15", default-features = false, features = ['wav']}
+rodio = { version = "0.15", default-features = false, features = ['wav'] }
