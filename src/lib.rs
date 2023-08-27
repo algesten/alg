@@ -4,6 +4,7 @@
 #[macro_use]
 extern crate log;
 
+pub mod bitfield;
 pub mod clock;
 pub mod encoder;
 pub mod euclid;
