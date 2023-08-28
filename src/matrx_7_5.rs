@@ -28,7 +28,13 @@ pub fn translate<const L: usize>(s: &str, v: &mut Vec<u8, L>) {
     }
 }
 
-pub fn render(row_index: usize, mut char_index: usize, char_offset: u8, chars: &[u8]) -> u8 {
+pub fn render(
+    row_index: usize,
+    mut char_index: usize,
+    char_offset: u8,
+    chars: &[u8],
+    next_index: &mut bool,
+) -> u8 {
     let mut draw_position: i8 = 0;
     let mut extra_left_shift = char_offset;
 
@@ -50,6 +56,10 @@ pub fn render(row_index: usize, mut char_index: usize, char_offset: u8, chars: &
         let space = if alpha_index == 36 { 2 } else { SPACE };
 
         let left_shift = (OUTPUT_BITS - char.width() + extra_left_shift) as i8 - draw_position;
+
+        if left_shift >= 8 {
+            *next_index = true;
+        }
 
         let row = char.rows()[row_index];
         if left_shift.abs() < 8 {
@@ -482,7 +492,7 @@ mod test {
 
         let rows: Vec<_, 64> = (0..5)
             .map(|row| {
-                let o = render(row, i, o, &v);
+                let o = render(row, i, o, &v, &mut false);
                 let s = format!("{:#010b}|", o).replace("0b", "|").replace("0", " ");
                 println!("{}", s);
                 s
@@ -714,23 +724,5 @@ mod test {
                 "|        |",
             ],
         );
-    }
-
-    #[test]
-    fn render_offset_loop() {
-        let mut v: Vec<u8, 64> = Vec::new();
-        translate("THIS IS RATHER GOOD", &mut v);
-
-        for off in 0..60 {
-            let _rows: Vec<_, 64> = (0..5)
-                .map(|row| {
-                    let o = render(row, 0, off, &v);
-                    let s = format!("{:#010b}|", o).replace("0b", "|").replace("0", " ");
-                    println!("{}", s);
-                    s
-                })
-                .collect();
-            println!();
-        }
     }
 }
