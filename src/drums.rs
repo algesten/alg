@@ -103,19 +103,19 @@ impl Drums {
     }
 }
 
-// #[cfg(test)]
-// mod test {
-//     use super::*;
+#[cfg(test)]
+mod test {
+    use super::*;
 
-//     #[test]
-//     fn drum_test() {
-//         let mut drums = Drums::new();
+    #[test]
+    fn drum_test() {
+        let mut drums = Drums::new();
 
-//         drums.add_track("|x---x---x---x---|"); // kick
-//         drums.add_track("|----x-------x---|"); // clap
-//         drums.add_track("|x---x-x-x---x-x-|"); // hh cl
-//         drums.add_track("|--x-------x-----|"); // hh op
+        drums.add_pattern("|x---x---x---x---|"); // kick
+        drums.add_pattern("|----x-------x---|"); // clap
+        drums.add_pattern("|x---x-x-x---x-x-|"); // hh cl
+        drums.add_pattern("|--x-------x-----|"); // hh op
 
-//         drums.play(1);
-//     }
-// }
+        drums.play(1);
+    }
+}
