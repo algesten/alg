@@ -4,11 +4,13 @@
 #[macro_use]
 extern crate log;
 
+pub mod audio;
 pub mod bitfield;
 pub mod clock;
 pub mod encoder;
 pub mod euclid;
 pub mod exec;
+pub mod f32cmp;
 pub mod gen;
 pub mod geom;
 pub mod input;

@@ -13,6 +13,8 @@ gcd = "2"
 log = "0.4"
 defmt = "0.3"
 heapless = "0.8.0"
+micromath = "2.1.0"
+const_soft_float = { version = "0.1.4", features = ["no_std"] }
 
 [dev-dependencies]
 rodio = { version = "0.17.3", default-features = false, features = ['wav'] }
