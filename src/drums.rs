@@ -32,6 +32,30 @@ fn wav(bytes: &'static [u8], volume: f32, duration: f32) -> impl Source<Item = i
         .take_crossfade_with(silence, Duration::from_secs_f32(duration))
 }
 
+#[derive(Clone, Copy)]
+pub enum Drums {
+    Kick,
+    Clap,
+    HiHatClosed,
+    HiHatOpen,
+}
+
+impl Drums {
+    fn bytes(self) -> &'static [u8] {
+        match self {
+            Drums::Kick => SAMPLES[0],
+            Drums::Clap => SAMPLES[1],
+            Drums::HiHatClosed => SAMPLES[2],
+            Drums::HiHatOpen => SAMPLES[3],
+        }
+    }
+
+    pub fn as_source(self) -> impl Source<Item = f32> {
+        let buf = BufReader::new(Cursor::new(self.bytes()));
+        Decoder::new(buf).unwrap().convert_samples()
+    }
+}
+
 #[derive(Default)]
 pub struct Machine {
     tracks: Vec<Pattern>,
@@ -119,3 +143,22 @@ impl Machine {
 //         drums.play(1);
 //     }
 // }
+
+#[test]
+fn drum_channels_rate() {
+    let kick = Drums::Kick.as_source();
+    assert_eq!(kick.channels(), 1);
+    assert_eq!(kick.sample_rate(), 44100);
+
+    let clap = Drums::Clap.as_source();
+    assert_eq!(clap.channels(), 1);
+    assert_eq!(clap.sample_rate(), 44100);
+
+    let hhcl = Drums::HiHatClosed.as_source();
+    assert_eq!(hhcl.channels(), 1);
+    assert_eq!(hhcl.sample_rate(), 44100);
+
+    let hhop = Drums::HiHatOpen.as_source();
+    assert_eq!(hhop.channels(), 1);
+    assert_eq!(hhop.sample_rate(), 44100);
+}

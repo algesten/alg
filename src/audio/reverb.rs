@@ -8,7 +8,7 @@ use super::diffusion::Diffuser;
 use super::feedback::MixedFeedback;
 use super::AudioNode;
 
-pub struct BasicReverb<D, const C: usize, const S: usize> {
+struct BasicReverb<D, const C: usize, const S: usize> {
     diffuser: Diffuser<D, C, S>,
     feedback: MixedFeedback<D, C>,
     dry: f32,
@@ -51,5 +51,41 @@ impl<D: Delay, const C: usize, const S: usize> AudioNode<C> for BasicReverb<D, C
         }
 
         mixed
+    }
+}
+
+pub struct Reverb<D> {
+    basic: BasicReverb<D, 8, 4>,
+}
+
+impl<D: Delay> Reverb<D> {
+    pub fn new(sample_rate: usize, room_size_secs: f32, rt60: f32, dry: f32, wet: f32) -> Self {
+        Reverb {
+            basic: BasicReverb::new(sample_rate, room_size_secs, rt60, dry, wet),
+        }
+    }
+}
+
+impl<D: Delay> AudioNode<2> for Reverb<D> {
+    fn process(&mut self, input: [f32; 2]) -> [f32; 2] {
+        let input_8 = [
+            // L
+            input[0] / 4.0,
+            input[0] / 4.0,
+            input[0] / 4.0,
+            input[0] / 4.0,
+            // R
+            input[1] / 4.0,
+            input[1] / 4.0,
+            input[1] / 4.0,
+            input[1] / 4.0,
+        ];
+
+        let output_8 = self.basic.process(input_8);
+
+        [
+            output_8[0] + output_8[1] + output_8[2] + output_8[3],
+            output_8[4] + output_8[5] + output_8[6] + output_8[7],
+        ]
     }
 }

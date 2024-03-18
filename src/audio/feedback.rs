@@ -35,11 +35,11 @@ impl<D: Delay, const C: usize> MixedFeedback<D, C> {
 
 impl<D: Delay, const C: usize> AudioNode<C> for MixedFeedback<D, C> {
     fn process(&mut self, input: [f32; C]) -> [f32; C] {
-        let mut delayed: [_; C] = array::from_fn(|i| self.delays[i].read());
+        let delayed: [_; C] = array::from_fn(|i| self.delays[i].read());
 
         // Mix a bit of all channels into all channels.
-        let mixed = delayed.clone();
-        transform_householder(&mut delayed);
+        let mut mixed = delayed.clone();
+        transform_householder(&mut mixed);
 
         for i in 0..C {
             // Mix new value with old.
@@ -47,6 +47,6 @@ impl<D: Delay, const C: usize> AudioNode<C> for MixedFeedback<D, C> {
             self.delays[i].write(sum);
         }
 
-        mixed
+        delayed
     }
 }
