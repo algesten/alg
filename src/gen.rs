@@ -371,7 +371,7 @@ fn generate(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::drums::Drums;
+    use crate::drums::Machine;
 
     #[test]
     fn generate_test() {
@@ -380,7 +380,7 @@ mod test {
         }
         let x = STOKAST_PARAMS.seed;
         for i in x..(x + 1000) {
-            let mut drums = Drums::new();
+            let mut drums = Machine::new();
 
             let mut params = STOKAST_PARAMS;
             params.seed = i;

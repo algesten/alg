@@ -33,11 +33,11 @@ fn wav(bytes: &'static [u8], volume: f32, duration: f32) -> impl Source<Item = i
 }
 
 #[derive(Default)]
-pub struct Drums {
+pub struct Machine {
     tracks: Vec<Pattern>,
 }
 
-impl std::fmt::Debug for Drums {
+impl std::fmt::Debug for Machine {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f)?;
 
@@ -49,7 +49,7 @@ impl std::fmt::Debug for Drums {
     }
 }
 
-impl Drums {
+impl Machine {
     pub fn new() -> Self {
         Self::default()
     }
