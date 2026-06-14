@@ -5,6 +5,7 @@
 extern crate log;
 
 pub mod audio;
+pub mod audio2;
 pub mod bitfield;
 pub mod clock;
 pub mod encoder;
