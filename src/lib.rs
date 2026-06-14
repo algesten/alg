@@ -17,6 +17,7 @@ pub mod geom;
 pub mod input;
 pub mod matrx_7_5;
 pub mod pat;
+pub mod pcm3060;
 pub mod ring_buf;
 pub mod rnd;
 pub mod tempo;
